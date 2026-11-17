@@ -23,14 +23,29 @@ class _AccountsListScreenState extends State<AccountsListScreen> {
   Future<void> _loadAccounts() async {
     setState(() => _loading = true);
     try {
-      final companyId = await ApiClient().getActiveCompany();
-      if (companyId == null) return;
+      var companyId = await ApiClient().getActiveCompany();
+      if (companyId == null) {
+        final compRes = await ApiClient().dio.get('/companies').catchError((_) => null);
+        if (compRes != null && compRes.data != null) {
+          final list = compRes.data is List ? compRes.data : (compRes.data['data'] ?? []);
+          if (list is List && list.isNotEmpty) {
+            companyId = list[0]['id'];
+            await ApiClient().setActiveCompany(companyId!);
+          }
+        }
+      }
+      if (companyId == null) {
+        if (mounted) setState(() { _accounts = []; _loading = false; });
+        return;
+      }
       final res = await ApiClient().dio.get('/companies/$companyId/accounts', queryParameters: {
         if (_searchQuery.isNotEmpty) 'search': _searchQuery,
         if (_filter != 'ALL') 'type': _filter,
       });
-      setState(() { _accounts = res.data['data'] ?? res.data ?? []; _loading = false; });
-    } catch (_) { setState(() => _loading = false); }
+      if (mounted) setState(() { _accounts = res.data['data'] ?? res.data ?? []; _loading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   Color _balanceColor(int balance) => balance > 0 ? AppColors.debit : balance < 0 ? AppColors.credit : AppColors.textSecondaryDark;

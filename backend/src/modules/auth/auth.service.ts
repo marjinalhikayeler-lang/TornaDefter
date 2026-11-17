@@ -111,6 +111,23 @@ export class AuthService {
       });
     }
 
+    // Otomatik varsayılan işletme/firma oluştur
+    const company = await this.prisma.company.create({
+      data: {
+        name: `${dto.first_name} ${dto.last_name} İşletmesi`,
+        owner_id: user.id,
+        default_currency: 'TRY',
+      },
+    });
+
+    await this.prisma.companyUser.create({
+      data: {
+        company_id: company.id,
+        user_id: user.id,
+        role: 'OWNER',
+      },
+    });
+
     // Token oluştur
     const tokens = await this.generateTokens(user.id, user.email);
 
@@ -124,6 +141,15 @@ export class AuthService {
 
     return {
       user: this.sanitizeUser(user),
+      companies: [
+        {
+          id: company.id,
+          name: company.name,
+          logo_url: company.logo_url,
+          default_currency: company.default_currency,
+          role: 'OWNER',
+        },
+      ],
       ...tokens,
     };
   }

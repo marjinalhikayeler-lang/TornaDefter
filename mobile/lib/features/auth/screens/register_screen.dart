@@ -36,6 +36,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         'terms_accepted': true,
       });
       await ApiClient().setTokens(res.data['access_token'], res.data['refresh_token']);
+      if (res.data['companies'] != null && (res.data['companies'] as List).isNotEmpty) {
+        await ApiClient().setActiveCompany(res.data['companies'][0]['id']);
+      }
       if (mounted) context.go('/home');
     } on DioException catch (e) {
       final msg = e.response?.data?['message'];

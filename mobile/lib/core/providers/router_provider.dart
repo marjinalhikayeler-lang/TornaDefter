@@ -13,6 +13,10 @@ import '../../features/cash/screens/cash_screen.dart';
 import '../../features/reports/screens/reports_screen.dart';
 import '../../features/settings/screens/settings_screen.dart';
 import '../../features/cheques/screens/cheques_screen.dart';
+import '../../features/notifications/screens/notifications_screen.dart';
+import '../../features/backup/screens/backup_screen.dart';
+import '../../features/support/screens/support_screen.dart';
+import '../../features/installments/screens/installments_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -83,6 +87,22 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/cheques',
         builder: (context, state) => const ChequesScreen(),
+      ),
+      GoRoute(
+        path: '/notifications',
+        builder: (context, state) => const NotificationsScreen(),
+      ),
+      GoRoute(
+        path: '/backup',
+        builder: (context, state) => const BackupScreen(),
+      ),
+      GoRoute(
+        path: '/support',
+        builder: (context, state) => const SupportScreen(),
+      ),
+      GoRoute(
+        path: '/installments',
+        builder: (context, state) => const InstallmentsScreen(),
       ),
     ],
   );

@@ -29,13 +29,24 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> with SingleTi
 
   Future<void> _loadData() async {
     try {
-      final companyId = await ApiClient().getActiveCompany();
-      if (companyId == null) return;
-      final res = await ApiClient().dio.get('/companies/$companyId/accounts/${widget.accountId}');
-      _account = res.data is Map ? res.data : (res.data?['data'] ?? {});
-      
-      final txRes = await ApiClient().dio.get('/companies/$companyId/accounts/${widget.accountId}/transactions');
-      _transactions = txRes.data?['items'] ?? txRes.data?['data'] ?? [];
+      var companyId = await ApiClient().getActiveCompany();
+      if (companyId == null) {
+        final compRes = await ApiClient().dio.get('/companies').catchError((_) => null);
+        if (compRes != null && compRes.data != null) {
+          final list = compRes.data is List ? compRes.data : (compRes.data['data'] ?? []);
+          if (list is List && list.isNotEmpty) {
+            companyId = list[0]['id'];
+            await ApiClient().setActiveCompany(companyId!);
+          }
+        }
+      }
+      if (companyId != null) {
+        final res = await ApiClient().dio.get('/companies/$companyId/accounts/${widget.accountId}');
+        _account = res.data is Map ? res.data : (res.data?['data'] ?? {});
+        
+        final txRes = await ApiClient().dio.get('/companies/$companyId/accounts/${widget.accountId}/transactions');
+        _transactions = txRes.data?['items'] ?? txRes.data?['data'] ?? [];
+      }
     } catch (_) {}
     if (mounted) setState(() => _loading = false);
   }

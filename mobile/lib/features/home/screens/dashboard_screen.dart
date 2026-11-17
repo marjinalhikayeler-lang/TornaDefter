@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/api/api_client.dart';
@@ -21,16 +22,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _loadData() async {
     try {
-      final companyId = await ApiClient().getActiveCompany();
-      if (companyId == null) return;
-      // Paralel API çağrıları
-      final futures = await Future.wait([
-        ApiClient().dio.get('/companies/$companyId/cash-accounts/summary').catchError((_) => null),
-        ApiClient().dio.get('/companies/$companyId/bank-accounts/summary').catchError((_) => null),
-      ]);
-      setState(() { _loading = false; });
+      var companyId = await ApiClient().getActiveCompany();
+      if (companyId == null) {
+        final compRes = await ApiClient().dio.get('/companies').catchError((_) => null);
+        if (compRes != null && compRes.data != null) {
+          final list = compRes.data is List ? compRes.data : (compRes.data['data'] ?? []);
+          if (list is List && list.isNotEmpty) {
+            companyId = list[0]['id'];
+            await ApiClient().setActiveCompany(companyId!);
+          }
+        }
+      }
+      if (companyId != null) {
+        await Future.wait([
+          ApiClient().dio.get('/companies/$companyId/cash-accounts/summary').catchError((_) => null),
+          ApiClient().dio.get('/companies/$companyId/bank-accounts/summary').catchError((_) => null),
+        ]);
+      }
     } catch (_) {
-      setState(() => _loading = false);
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -41,8 +52,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
       appBar: AppBar(
         title: const Text('TornaDefter'),
         actions: [
-          IconButton(icon: const Icon(Icons.notifications_outlined), onPressed: () {}),
-          IconButton(icon: const Icon(Icons.settings), onPressed: () {}),
+          IconButton(
+            icon: const Icon(Icons.notifications_outlined),
+            tooltip: 'Bildirimler',
+            onPressed: () => context.push('/notifications'),
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            tooltip: 'Ayarlar',
+            onPressed: () => context.push('/more'),
+          ),
         ],
       ),
       body: RefreshIndicator(
@@ -76,14 +95,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 mainAxisSpacing: 12,
                 crossAxisSpacing: 12,
                 children: [
-                  _quickAction(Icons.people, 'Cariler', AppColors.primary, () {}),
-                  _quickAction(Icons.receipt_long, 'İşlemler', AppColors.success, () {}),
-                  _quickAction(Icons.account_balance, 'Kasa', AppColors.warning, () {}),
-                  _quickAction(Icons.description, 'Çek/Senet', AppColors.info, () {}),
-                  _quickAction(Icons.bar_chart, 'Raporlar', AppColors.accent, () {}),
-                  _quickAction(Icons.category, 'Gelir/Gider', Colors.purple, () {}),
-                  _quickAction(Icons.backup, 'Yedekleme', Colors.teal, () {}),
-                  _quickAction(Icons.help_outline, 'Destek', Colors.pink, () {}),
+                  _quickAction(Icons.people, 'Cariler', AppColors.primary, () => context.push('/accounts')),
+                  _quickAction(Icons.receipt_long, 'İşlemler', AppColors.success, () => context.push('/accounts')),
+                  _quickAction(Icons.account_balance, 'Kasa', AppColors.warning, () => context.push('/cash')),
+                  _quickAction(Icons.description, 'Çek/Senet', AppColors.info, () => context.push('/cheques')),
+                  _quickAction(Icons.bar_chart, 'Raporlar', AppColors.accent, () => context.push('/reports')),
+                  _quickAction(Icons.view_timeline, 'Taksitler', Colors.purple, () => context.push('/installments')),
+                  _quickAction(Icons.backup, 'Yedekleme', Colors.teal, () => context.push('/backup')),
+                  _quickAction(Icons.help_outline, 'Destek', Colors.pink, () => context.push('/support')),
                 ],
               ),
               const SizedBox(height: 24),
