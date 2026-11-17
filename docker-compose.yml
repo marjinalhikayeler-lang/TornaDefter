@@ -1,0 +1,92 @@
+version: '3.8'
+
+# TornaDefter - Cari Hesap Takip Sistemi
+# Docker Compose yapılandırması
+services:
+  # PostgreSQL veritabanı
+  postgres:
+    image: postgres:16
+    container_name: tornadefter-postgres
+    restart: unless-stopped
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tornadefter}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tornadefter_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-tornadefter_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-tornadefter}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - tornadefter-network
+
+  # Redis önbellek ve kuyruk yönetimi
+  redis:
+    image: redis:7-alpine
+    container_name: tornadefter-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - tornadefter-network
+
+  # NestJS Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tornadefter-backend
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-tornadefter}:${POSTGRES_PASSWORD:-tornadefter_secret}@postgres:5432/${POSTGRES_DB:-tornadefter_db}?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:-change-this-in-production}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      PORT: 3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - tornadefter-network
+
+  # Web Admin Panel (Flutter Web veya ayrı bir frontend)
+  web-admin:
+    build:
+      context: ./web-admin
+      dockerfile: Dockerfile
+    container_name: tornadefter-web-admin
+    restart: unless-stopped
+    ports:
+      - '3001:80'
+    depends_on:
+      - backend
+    networks:
+      - tornadefter-network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  tornadefter-network:
+    driver: bridge

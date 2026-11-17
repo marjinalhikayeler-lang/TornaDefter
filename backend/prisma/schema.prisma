@@ -1,0 +1,1380 @@
+// ============================================================================
+// TornaDefter - Cari Hesap Takip Sistemi
+// Prisma Schema - PostgreSQL
+// ============================================================================
+// Para birimleri kuruş cinsinden (Int) saklanır. Float kullanılmaz.
+// Tüm tablolarda soft delete (deleted_at) mevcuttur.
+// ============================================================================
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum LockTimeout {
+  IMMEDIATE
+  ONE_MIN
+  FIVE_MIN
+}
+
+enum CompanyRole {
+  OWNER
+  MANAGER
+  ACCOUNTANT
+  VIEWER
+}
+
+enum AccountType {
+  CUSTOMER    // Müşteri
+  SUPPLIER    // Tedarikçi
+  PERSONNEL   // Personel
+  PARTNER     // Ortak
+  OTHER       // Diğer
+}
+
+enum BalanceDirection {
+  DEBIT   // Borç
+  CREDIT  // Alacak
+}
+
+enum TransactionType {
+  SALE          // Satış
+  COLLECTION    // Tahsilat
+  PURCHASE      // Alış
+  PAYMENT       // Ödeme
+  SALARY        // Maaş
+  ADVANCE       // Avans
+  OFFSET        // Mahsup
+  CORRECTION    // Düzeltme
+}
+
+enum PaymentMethod {
+  CASH              // Nakit
+  BANK_TRANSFER     // Havale/EFT
+  CREDIT_CARD       // Kredi Kartı
+  CHEQUE            // Çek
+  PROMISSORY_NOTE   // Senet
+}
+
+enum Frequency {
+  WEEKLY    // Haftalık
+  MONTHLY   // Aylık
+  YEARLY    // Yıllık
+}
+
+enum TransferAccountType {
+  CASH   // Kasa
+  BANK   // Banka
+}
+
+enum CategoryType {
+  INCOME    // Gelir
+  EXPENSE   // Gider
+}
+
+enum IncomeExpenseType {
+  INCOME    // Gelir
+  EXPENSE   // Gider
+}
+
+enum ChequeNoteType {
+  CHEQUE          // Çek
+  PROMISSORY_NOTE // Senet
+}
+
+enum ChequeNoteDirection {
+  RECEIVED  // Alınan
+  GIVEN     // Verilen
+}
+
+enum ChequeNoteStatus {
+  IN_PORTFOLIO  // Portföyde
+  DEPOSITED     // Bankaya Verildi
+  COLLECTED     // Tahsil Edildi
+  ENDORSED      // Ciro Edildi
+  PAID          // Ödendi
+  BOUNCED       // Karşılıksız
+  RETURNED      // İade Edildi
+  CANCELLED     // İptal Edildi
+}
+
+enum NotificationType {
+  PAYMENT_DUE         // Vade Hatırlatma
+  CHEQUE_DUE          // Çek/Senet Vadesi
+  RISK_LIMIT          // Risk Limiti Aşımı
+  BACKUP_COMPLETE     // Yedekleme Tamamlandı
+  SUBSCRIPTION_EXPIRY // Abonelik Süresi
+  SYSTEM              // Sistem Bildirimi
+  REPORT_READY        // Rapor Hazır
+  INVITATION          // Davet
+}
+
+enum ReminderChannel {
+  PUSH      // Bildirim
+  SMS       // SMS
+  WHATSAPP  // WhatsApp
+  EMAIL     // E-posta
+}
+
+enum ReminderStatus {
+  PENDING   // Bekliyor
+  SENT      // Gönderildi
+  FAILED    // Başarısız
+}
+
+enum TemplateType {
+  REMINDER    // Hatırlatma
+  STATEMENT   // Ekstre
+  CUSTOM      // Özel
+}
+
+enum BackupType {
+  AUTO    // Otomatik
+  MANUAL  // Manuel
+}
+
+enum BackupStatus {
+  IN_PROGRESS   // Devam Ediyor
+  COMPLETED     // Tamamlandı
+  FAILED        // Başarısız
+}
+
+enum AuditAction {
+  CREATE          // Oluşturma
+  UPDATE          // Güncelleme
+  DELETE          // Silme
+  VIEW            // Görüntüleme
+  LOGIN           // Giriş
+  LOGOUT          // Çıkış
+  PASSWORD_RESET  // Şifre Sıfırlama
+}
+
+enum SubscriptionStatus {
+  TRIAL       // Deneme
+  ACTIVE      // Aktif
+  PAST_DUE    // Gecikmiş
+  CANCELLED   // İptal Edildi
+  EXPIRED     // Süresi Doldu
+}
+
+enum PaymentProvider {
+  IYZICO      // iyzico
+  PAYTR       // PayTR
+  GOOGLE_PLAY // Google Play
+  APP_STORE   // App Store
+}
+
+enum PaymentStatus {
+  PENDING     // Bekliyor
+  COMPLETED   // Tamamlandı
+  FAILED      // Başarısız
+  REFUNDED    // İade Edildi
+}
+
+enum TicketStatus {
+  OPEN          // Açık
+  IN_PROGRESS   // İşlemde
+  RESOLVED      // Çözüldü
+  CLOSED        // Kapatıldı
+}
+
+enum TicketPriority {
+  LOW     // Düşük
+  MEDIUM  // Orta
+  HIGH    // Yüksek
+}
+
+enum SenderType {
+  USER    // Kullanıcı
+  ADMIN   // Yönetici
+}
+
+enum AdminRole {
+  SUPER_ADMIN   // Süper Admin
+  SUPPORT       // Destek
+  FINANCE       // Finans
+  FULL_ACCESS   // Tam Erişim
+}
+
+enum InstallmentStatus {
+  PENDING       // Bekliyor
+  PAID          // Ödendi
+  OVERDUE       // Gecikmiş
+  CANCELLED     // İptal
+}
+
+enum ExportFormat {
+  PDF
+  EXCEL
+  WORD
+  JPEG
+  ODS
+  ODT
+}
+
+// ============================================================================
+// KULLANICI YÖNETİMİ
+// ============================================================================
+
+/// Kullanıcılar tablosu
+model User {
+  id                    String    @id @default(uuid()) @db.Uuid
+  email                 String    @unique
+  phone                 String?   @unique
+  password_hash         String
+  password_encrypted    String?   // AES-256 şifreli, admin panelden görmek için
+  first_name            String
+  last_name             String
+  avatar_url            String?
+  email_verified        Boolean   @default(false)
+  phone_verified        Boolean   @default(false)
+  is_active             Boolean   @default(true)
+  pin_hash              String?
+  biometric_enabled     Boolean   @default(false)
+  lock_timeout          LockTimeout @default(FIVE_MIN)
+  failed_login_attempts Int       @default(0)
+  locked_until          DateTime?
+  must_change_password  Boolean   @default(false)
+  last_login_at         DateTime?
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // İlişkiler
+  sessions          UserSession[]
+  owned_companies   Company[]        @relation("CompanyOwner")
+  company_users     CompanyUser[]
+  subscriptions     Subscription[]
+  payments          Payment[]
+  notifications     Notification[]
+  notification_settings NotificationSetting[]
+  support_tickets   SupportTicket[]
+  user_notes        UserNote[]
+  audit_logs        AuditLog[]
+
+  @@index([email])
+  @@index([phone])
+  @@index([is_active])
+  @@map("users")
+}
+
+/// Kullanıcı oturumları
+model UserSession {
+  id                 String   @id @default(uuid()) @db.Uuid
+  user_id            String   @db.Uuid
+  device_name        String?
+  device_type        String?
+  ip_address         String?
+  token_hash         String   @unique
+  refresh_token_hash String   @unique
+  expires_at         DateTime
+  last_active_at     DateTime @default(now())
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // İlişkiler
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([token_hash])
+  @@index([refresh_token_hash])
+  @@index([expires_at])
+  @@map("user_sessions")
+}
+
+// ============================================================================
+// ŞİRKET YÖNETİMİ
+// ============================================================================
+
+/// Şirketler tablosu
+model Company {
+  id                String   @id @default(uuid()) @db.Uuid
+  owner_id          String   @db.Uuid
+  name              String
+  tax_office        String?
+  tax_number        String?
+  address           String?
+  city              String?
+  district          String?
+  phone             String?
+  email             String?
+  logo_url          String?
+  default_currency  String   @default("TRY")
+  decimal_places    Int      @default(2)
+  fiscal_year_start Int      @default(1) // Ay numarası (1=Ocak)
+  is_archived       Boolean  @default(false)
+  is_deleted        Boolean  @default(false)
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // İlişkiler
+  owner                 User                  @relation("CompanyOwner", fields: [owner_id], references: [id])
+  company_users         CompanyUser[]
+  invitations           Invitation[]
+  accounts              Account[]
+  account_groups        AccountGroup[]
+  tags                  Tag[]
+  transactions          Transaction[]
+  recurring_transactions RecurringTransaction[]
+  allocations           Allocation[]
+  cash_accounts         CashAccount[]
+  bank_accounts         BankAccount[]
+  credit_card_accounts  CreditCardAccount[]
+  transfers             Transfer[]
+  categories            Category[]
+  income_expenses       IncomeExpense[]
+  cheques_notes         ChequeNote[]
+  notifications         Notification[]
+  notification_settings NotificationSetting[]
+  reminders             Reminder[]
+  message_templates     MessageTemplate[]
+  backups               Backup[]
+  report_schedules      ReportSchedule[]
+  audit_logs            AuditLog[]
+  support_tickets       SupportTicket[]
+  installment_plans     InstallmentPlan[]
+  data_imports          DataImport[]
+
+  @@index([owner_id])
+  @@index([tax_number])
+  @@index([is_archived, is_deleted])
+  @@map("companies")
+}
+
+/// Şirket kullanıcıları (çoklu kullanıcı desteği)
+model CompanyUser {
+  id                 String      @id @default(uuid()) @db.Uuid
+  company_id         String      @db.Uuid
+  user_id            String      @db.Uuid
+  role               CompanyRole @default(VIEWER)
+  custom_permissions Json?
+  invited_by         String?     @db.Uuid
+  joined_at          DateTime    @default(now())
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // İlişkiler
+  company Company @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([company_id, user_id])
+  @@index([company_id])
+  @@index([user_id])
+  @@map("company_users")
+}
+
+/// Davetler
+model Invitation {
+  id          String      @id @default(uuid()) @db.Uuid
+  company_id  String      @db.Uuid
+  email       String
+  role        CompanyRole @default(VIEWER)
+  token       String      @unique
+  expires_at  DateTime
+  accepted_at DateTime?
+  invited_by  String      @db.Uuid
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // İlişkiler
+  company Company @relation(fields: [company_id], references: [id], onDelete: Cascade)
+
+  @@index([company_id])
+  @@index([token])
+  @@index([email])
+  @@map("invitations")
+}
+
+// ============================================================================
+// CARİ HESAPLAR
+// ============================================================================
+
+/// Cari hesaplar (müşteri, tedarikçi, personel vb.)
+model Account {
+  id                       String           @id @default(uuid()) @db.Uuid
+  company_id               String           @db.Uuid
+  code                     String           // Otomatik: M-0001, T-0001 vb.
+  title                    String
+  account_type             AccountType      @default(CUSTOMER)
+  is_bidirectional         Boolean          @default(false)
+  authorized_person        String?
+  phones                   Json?            // String[] olarak kullanılır
+  email                    String?
+  address                  String?
+  city                     String?
+  district                 String?
+  tax_office               String?
+  tax_number               String?
+  identity_number          String?
+  iban_encrypted           String?
+  notes                    String?
+  risk_limit               Int?             // Kuruş cinsinden
+  default_due_days         Int?
+  currency                 String           @default("TRY")
+  opening_balance          Int              @default(0) // Kuruş cinsinden
+  opening_balance_direction BalanceDirection @default(DEBIT)
+  opening_date             DateTime?
+  group_id                 String?          @db.Uuid
+  is_archived              Boolean          @default(false)
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // İlişkiler
+  company       Company       @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  group         AccountGroup? @relation(fields: [group_id], references: [id], onDelete: SetNull)
+  transactions  Transaction[]
+  account_tags  AccountTag[]
+  reminders     Reminder[]
+  cheques_notes ChequeNote[]  @relation("ChequeNoteAccount")
+  endorsed_cheques ChequeNote[] @relation("EndorsedToAccount")
+  recurring_transactions RecurringTransaction[]
+  installment_plans InstallmentPlan[]
+
+  @@unique([company_id, code])
+  @@index([company_id])
+  @@index([company_id, account_type])
+  @@index([company_id, title])
+  @@index([group_id])
+  @@index([tax_number])
+  @@index([is_archived])
+  @@map("accounts")
+}
+
+/// Cari hesap grupları (hiyerarşik)
+model AccountGroup {
+  id         String  @id @default(uuid()) @db.Uuid
+  company_id String  @db.Uuid
+  name       String
+  parent_id  String? @db.Uuid
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // İlişkiler
+  company  Company        @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  parent   AccountGroup?  @relation("AccountGroupHierarchy", fields: [parent_id], references: [id], onDelete: SetNull)
+  children AccountGroup[] @relation("AccountGroupHierarchy")
+  accounts Account[]
+
+  @@unique([company_id, name, parent_id])
+  @@index([company_id])
+  @@index([parent_id])
+  @@map("account_groups")
+}
+
+/// Etiketler
+model Tag {
+  id         String @id @default(uuid()) @db.Uuid
+  company_id String @db.Uuid
+  name       String
+  color      String @default("#3B82F6")
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // İlişkiler
+  company      Company      @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  account_tags AccountTag[]
+
+  @@unique([company_id, name])
+  @@index([company_id])
+  @@map("tags")
+}
+
+/// Cari hesap - etiket eşleştirmesi (çoka çok)
+model AccountTag {
+  account_id String @db.Uuid
+  tag_id     String @db.Uuid
+
+  created_at DateTime @default(now())
+
+  // İlişkiler
+  account Account @relation(fields: [account_id], references: [id], onDelete: Cascade)
+  tag     Tag     @relation(fields: [tag_id], references: [id], onDelete: Cascade)
+
+  @@id([account_id, tag_id])
+  @@index([account_id])
+  @@index([tag_id])
+  @@map("account_tags")
+}
+
+// ============================================================================
+// İŞLEMLER (HAREKETler)
+// ============================================================================
+
+/// İşlemler / Hareketler
+model Transaction {
+  id               String          @id @default(uuid()) @db.Uuid
+  company_id       String          @db.Uuid
+  account_id       String          @db.Uuid
+  type             TransactionType
+  amount           Int             // Kuruş cinsinden
+  currency         String          @default("TRY")
+  description      String?
+  document_number  String?
+  date             DateTime        @db.Date
+  due_date         DateTime?       @db.Date
+  payment_method   PaymentMethod?
+  cash_account_id  String?         @db.Uuid
+  bank_account_id  String?         @db.Uuid
+  category_id      String?         @db.Uuid
+  running_balance  Int             @default(0) // Kuruş cinsinden
+  notes            String?
+  is_reconciled    Boolean         @default(false)
+  recurring_id     String?         @db.Uuid
+  idempotency_key  String          @unique
+  created_by       String          @db.Uuid
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // İlişkiler
+  company              Company               @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  account              Account               @relation(fields: [account_id], references: [id], onDelete: Restrict)
+  cash_account         CashAccount?          @relation(fields: [cash_account_id], references: [id], onDelete: SetNull)
+  bank_account         BankAccount?          @relation(fields: [bank_account_id], references: [id], onDelete: SetNull)
+  category             Category?             @relation(fields: [category_id], references: [id], onDelete: SetNull)
+  recurring            RecurringTransaction? @relation(fields: [recurring_id], references: [id], onDelete: SetNull)
+  attachments          TransactionAttachment[]
+  debit_allocations    Allocation[]          @relation("DebitTransaction")
+  credit_allocations   Allocation[]          @relation("CreditTransaction")
+  reminders            Reminder[]
+  installment_plans    InstallmentPlan[]
+
+  @@index([company_id])
+  @@index([account_id])
+  @@index([company_id, account_id])
+  @@index([company_id, date])
+  @@index([company_id, due_date])
+  @@index([company_id, type])
+  @@index([date])
+  @@index([due_date])
+  @@index([document_number])
+  @@index([recurring_id])
+  @@index([created_by])
+  @@map("transactions")
+}
+
+/// İşlem ekleri (fatura fotoğrafı vb.)
+model TransactionAttachment {
+  id             String @id @default(uuid()) @db.Uuid
+  transaction_id String @db.Uuid
+  file_url       String
+  file_name      String
+  file_size      Int    // Byte cinsinden
+  mime_type      String
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // İlişkiler
+  transaction Transaction @relation(fields: [transaction_id], references: [id], onDelete: Cascade)
+
+  @@index([transaction_id])
+  @@map("transaction_attachments")
+}
+
+/// Tekrarlayan işlemler
+model RecurringTransaction {
+  id                   String          @id @default(uuid()) @db.Uuid
+  company_id           String          @db.Uuid
+  account_id           String          @db.Uuid
+  type                 TransactionType
+  amount               Int             // Kuruş cinsinden
+  currency             String          @default("TRY")
+  description          String?
+  payment_method       PaymentMethod?
+  frequency            Frequency
+  start_date           DateTime        @db.Date
+  end_date             DateTime?       @db.Date
+  max_occurrences      Int?
+  occurrences_created  Int             @default(0)
+  next_occurrence      DateTime?       @db.Date
+  is_active            Boolean         @default(true)
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // İlişkiler
+  company      Company       @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  account      Account       @relation(fields: [account_id], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@index([company_id])
+  @@index([account_id])
+  @@index([next_occurrence])
+  @@index([is_active])
+  @@map("recurring_transactions")
+}
+
+/// Kısmi tahsilat eşleştirmeleri
+model Allocation {
+  id                     String   @id @default(uuid()) @db.Uuid
+  company_id             String   @db.Uuid
+  debit_transaction_id   String   @db.Uuid
+  credit_transaction_id  String   @db.Uuid
+  amount                 Int      // Kuruş cinsinden
+  allocated_at           DateTime @default(now())
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // İlişkiler
+  company            Company     @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  debit_transaction  Transaction @relation("DebitTransaction", fields: [debit_transaction_id], references: [id], onDelete: Cascade)
+  credit_transaction Transaction @relation("CreditTransaction", fields: [credit_transaction_id], references: [id], onDelete: Cascade)
+
+  @@index([company_id])
+  @@index([debit_transaction_id])
+  @@index([credit_transaction_id])
+  @@map("allocations")
+}
+
+// ============================================================================
+// KASA & BANKA & KREDİ KARTI HESAPLARI
+// ============================================================================
+
+/// Kasa hesapları
+model CashAccount {
+  id              String  @id @default(uuid()) @db.Uuid
+  company_id      String  @db.Uuid
+  name            String
+  currency        String  @default("TRY")
+  opening_balance Int     @default(0) // Kuruş cinsinden
+  current_balance Int     @default(0) // Kuruş cinsinden
+  is_active       Boolean @default(true)
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // İlişkiler
+  company         Company         @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  transactions    Transaction[]
+  income_expenses IncomeExpense[] @relation("IncomeExpenseCashAccount")
+
+  @@index([company_id])
+  @@index([is_active])
+  @@map("cash_accounts")
+}
+
+/// Banka hesapları
+model BankAccount {
+  id              String  @id @default(uuid()) @db.Uuid
+  company_id      String  @db.Uuid
+  name            String
+  bank_name       String?
+  iban_encrypted  String?
+  currency        String  @default("TRY")
+  opening_balance Int     @default(0) // Kuruş cinsinden
+  current_balance Int     @default(0) // Kuruş cinsinden
+  is_active       Boolean @default(true)
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // İlişkiler
+  company         Company         @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  transactions    Transaction[]
+  income_expenses IncomeExpense[] @relation("IncomeExpenseBankAccount")
+
+  @@index([company_id])
+  @@index([is_active])
+  @@map("bank_accounts")
+}
+
+/// Kredi kartı hesapları
+model CreditCardAccount {
+  id              String  @id @default(uuid()) @db.Uuid
+  company_id      String  @db.Uuid
+  name            String
+  card_limit      Int     @default(0) // Kuruş cinsinden
+  statement_day   Int     // Ekstre kesim günü (1-31)
+  due_day         Int     // Son ödeme günü (1-31)
+  currency        String  @default("TRY")
+  current_balance Int     @default(0) // Kuruş cinsinden
+  is_active       Boolean @default(true)
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // İlişkiler
+  company Company @relation(fields: [company_id], references: [id], onDelete: Cascade)
+
+  @@index([company_id])
+  @@index([is_active])
+  @@map("credit_card_accounts")
+}
+
+/// Hesaplar arası transferler (kasa-banka arası)
+model Transfer {
+  id                String              @id @default(uuid()) @db.Uuid
+  company_id        String              @db.Uuid
+  from_account_type TransferAccountType
+  from_account_id   String              @db.Uuid
+  to_account_type   TransferAccountType
+  to_account_id     String              @db.Uuid
+  amount            Int                 // Kuruş cinsinden
+  currency          String              @default("TRY")
+  date              DateTime            @db.Date
+  description       String?
+  created_by        String              @db.Uuid
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // İlişkiler
+  company Company @relation(fields: [company_id], references: [id], onDelete: Cascade)
+
+  @@index([company_id])
+  @@index([company_id, date])
+  @@index([from_account_id])
+  @@index([to_account_id])
+  @@map("transfers")
+}
+
+// ============================================================================
+// GELİR / GİDER
+// ============================================================================
+
+/// Kategoriler (hiyerarşik gelir/gider kategorileri)
+model Category {
+  id         String       @id @default(uuid()) @db.Uuid
+  company_id String       @db.Uuid
+  name       String
+  parent_id  String?      @db.Uuid
+  type       CategoryType
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // İlişkiler
+  company      Company       @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  parent       Category?     @relation("CategoryHierarchy", fields: [parent_id], references: [id], onDelete: SetNull)
+  children     Category[]    @relation("CategoryHierarchy")
+  transactions Transaction[]
+  income_expenses IncomeExpense[]
+
+  @@unique([company_id, name, parent_id])
+  @@index([company_id])
+  @@index([company_id, type])
+  @@index([parent_id])
+  @@map("categories")
+}
+
+/// Gelir/Gider kayıtları
+model IncomeExpense {
+  id               String            @id @default(uuid()) @db.Uuid
+  company_id       String            @db.Uuid
+  type             IncomeExpenseType
+  category_id      String?           @db.Uuid
+  cash_account_id  String?           @db.Uuid
+  bank_account_id  String?           @db.Uuid
+  amount           Int               // Kuruş cinsinden
+  currency         String            @default("TRY")
+  date             DateTime          @db.Date
+  description      String?
+  document_number  String?
+  created_by       String            @db.Uuid
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // İlişkiler
+  company      Company      @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  category     Category?    @relation(fields: [category_id], references: [id], onDelete: SetNull)
+  cash_account CashAccount? @relation("IncomeExpenseCashAccount", fields: [cash_account_id], references: [id], onDelete: SetNull)
+  bank_account BankAccount? @relation("IncomeExpenseBankAccount", fields: [bank_account_id], references: [id], onDelete: SetNull)
+
+  @@index([company_id])
+  @@index([company_id, type])
+  @@index([company_id, date])
+  @@index([category_id])
+  @@index([date])
+  @@map("income_expenses")
+}
+
+// ============================================================================
+// ÇEK / SENET
+// ============================================================================
+
+/// Çek ve senetler
+model ChequeNote {
+  id                    String             @id @default(uuid()) @db.Uuid
+  company_id            String             @db.Uuid
+  type                  ChequeNoteType
+  direction             ChequeNoteDirection
+  amount                Int                // Kuruş cinsinden
+  currency              String             @default("TRY")
+  issue_date            DateTime?          @db.Date
+  due_date              DateTime           @db.Date
+  cheque_number         String?
+  bank_name             String?
+  branch_name           String?
+  drawer                String?            // Keşideci
+  related_account_id    String?            @db.Uuid
+  description           String?
+  photo_url             String?
+  status                ChequeNoteStatus   @default(IN_PORTFOLIO)
+  endorsed_to_account_id String?           @db.Uuid
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // İlişkiler
+  company              Company              @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  related_account      Account?             @relation("ChequeNoteAccount", fields: [related_account_id], references: [id], onDelete: SetNull)
+  endorsed_to_account  Account?             @relation("EndorsedToAccount", fields: [endorsed_to_account_id], references: [id], onDelete: SetNull)
+  history              ChequeNoteHistory[]
+  reminders            Reminder[]
+
+  @@index([company_id])
+  @@index([company_id, type])
+  @@index([company_id, direction])
+  @@index([company_id, status])
+  @@index([company_id, due_date])
+  @@index([due_date])
+  @@index([related_account_id])
+  @@index([cheque_number])
+  @@map("cheques_notes")
+}
+
+/// Çek/senet durum geçmişi
+model ChequeNoteHistory {
+  id             String           @id @default(uuid()) @db.Uuid
+  cheque_note_id String           @db.Uuid
+  from_status    ChequeNoteStatus
+  to_status      ChequeNoteStatus
+  date           DateTime         @default(now())
+  notes          String?
+  created_by     String           @db.Uuid
+
+  created_at DateTime @default(now())
+
+  // İlişkiler
+  cheque_note ChequeNote @relation(fields: [cheque_note_id], references: [id], onDelete: Cascade)
+
+  @@index([cheque_note_id])
+  @@map("cheque_note_history")
+}
+
+// ============================================================================
+// BİLDİRİMLER & HATIRLATMALAR
+// ============================================================================
+
+/// Bildirimler
+model Notification {
+  id         String           @id @default(uuid()) @db.Uuid
+  user_id    String           @db.Uuid
+  company_id String?          @db.Uuid
+  type       NotificationType
+  title      String
+  body       String
+  data       Json?
+  is_read    Boolean          @default(false)
+  read_at    DateTime?
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // İlişkiler
+  user    User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  company Company? @relation(fields: [company_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([user_id, is_read])
+  @@index([company_id])
+  @@map("notifications")
+}
+
+/// Bildirim tercihleri
+model NotificationSetting {
+  id                 String           @id @default(uuid()) @db.Uuid
+  user_id            String           @db.Uuid
+  company_id         String?          @db.Uuid
+  notification_type  NotificationType
+  is_enabled         Boolean          @default(true)
+  preferred_time     String?          // "09:00" formatında
+  preferred_channels Json?            // ["PUSH", "EMAIL"] gibi
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // İlişkiler
+  user    User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  company Company? @relation(fields: [company_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, company_id, notification_type])
+  @@index([user_id])
+  @@index([company_id])
+  @@map("notification_settings")
+}
+
+/// Hatırlatmalar
+model Reminder {
+  id              String          @id @default(uuid()) @db.Uuid
+  company_id      String          @db.Uuid
+  account_id      String?         @db.Uuid
+  transaction_id  String?         @db.Uuid
+  cheque_note_id  String?         @db.Uuid
+  remind_at       DateTime
+  channel         ReminderChannel
+  status          ReminderStatus  @default(PENDING)
+  template_id     String?         @db.Uuid
+  sent_at         DateTime?
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // İlişkiler
+  company     Company          @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  account     Account?         @relation(fields: [account_id], references: [id], onDelete: Cascade)
+  transaction Transaction?     @relation(fields: [transaction_id], references: [id], onDelete: Cascade)
+  cheque_note ChequeNote?      @relation(fields: [cheque_note_id], references: [id], onDelete: Cascade)
+  template    MessageTemplate? @relation(fields: [template_id], references: [id], onDelete: SetNull)
+
+  @@index([company_id])
+  @@index([remind_at])
+  @@index([status])
+  @@index([account_id])
+  @@index([transaction_id])
+  @@index([cheque_note_id])
+  @@map("reminders")
+}
+
+/// Mesaj şablonları
+model MessageTemplate {
+  id         String       @id @default(uuid()) @db.Uuid
+  company_id String       @db.Uuid
+  name       String
+  type       TemplateType
+  subject    String?
+  body       String
+  is_default Boolean      @default(false)
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // İlişkiler
+  company   Company    @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  reminders Reminder[]
+
+  @@index([company_id])
+  @@index([company_id, type])
+  @@map("message_templates")
+}
+
+// ============================================================================
+// YEDEKLEME & RAPORLAMA
+// ============================================================================
+
+/// Yedeklemeler
+model Backup {
+  id           String       @id @default(uuid()) @db.Uuid
+  company_id   String       @db.Uuid
+  type         BackupType
+  file_url     String?
+  file_size    Int?         // Byte cinsinden
+  status       BackupStatus @default(IN_PROGRESS)
+  started_at   DateTime     @default(now())
+  completed_at DateTime?
+  created_by   String?      @db.Uuid
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // İlişkiler
+  company Company @relation(fields: [company_id], references: [id], onDelete: Cascade)
+
+  @@index([company_id])
+  @@index([company_id, type])
+  @@index([status])
+  @@map("backups")
+}
+
+/// Rapor zamanlamaları
+model ReportSchedule {
+  id             String    @id @default(uuid()) @db.Uuid
+  company_id     String    @db.Uuid
+  report_type    String
+  filters        Json?
+  frequency      Frequency
+  delivery_email String
+  is_active      Boolean   @default(true)
+  next_run       DateTime?
+  created_by     String    @db.Uuid
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // İlişkiler
+  company Company @relation(fields: [company_id], references: [id], onDelete: Cascade)
+
+  @@index([company_id])
+  @@index([is_active, next_run])
+  @@map("report_schedules")
+}
+
+// ============================================================================
+// DENETİM KAYITLARI
+// ============================================================================
+
+/// Denetim kayıtları (audit log)
+model AuditLog {
+  id          String      @id @default(uuid()) @db.Uuid
+  company_id  String?     @db.Uuid
+  user_id     String      @db.Uuid
+  action      AuditAction
+  entity_type String
+  entity_id   String?
+  old_values  Json?
+  new_values  Json?
+  ip_address  String?
+  user_agent  String?
+
+  created_at DateTime @default(now())
+
+  // İlişkiler
+  company Company? @relation(fields: [company_id], references: [id], onDelete: SetNull)
+  user    User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([company_id])
+  @@index([user_id])
+  @@index([entity_type, entity_id])
+  @@index([action])
+  @@index([created_at])
+  @@map("audit_logs")
+}
+
+// ============================================================================
+// ABONELİK & ÖDEME
+// ============================================================================
+
+/// Planlar
+model Plan {
+  id               String  @id @default(uuid()) @db.Uuid
+  name             String
+  slug             String  @unique
+  max_accounts     Int
+  max_users        Int
+  max_companies    Int
+  backup_frequency String? // "DAILY", "WEEKLY" vb.
+  storage_limit    Int?    // MB cinsinden
+  available_reports Json?
+  price_monthly    Int     @default(0) // Kuruş cinsinden
+  price_yearly     Int     @default(0) // Kuruş cinsinden
+  trial_days       Int     @default(14)
+  is_active        Boolean @default(true)
+  sort_order       Int     @default(0)
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // İlişkiler
+  subscriptions Subscription[]
+
+  @@index([slug])
+  @@index([is_active, sort_order])
+  @@map("plans")
+}
+
+/// Abonelikler
+model Subscription {
+  id                   String             @id @default(uuid()) @db.Uuid
+  user_id              String             @db.Uuid
+  plan_id              String             @db.Uuid
+  status               SubscriptionStatus @default(TRIAL)
+  trial_ends_at        DateTime?
+  current_period_start DateTime?
+  current_period_end   DateTime?
+  cancelled_at         DateTime?
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // İlişkiler
+  user     User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  plan     Plan      @relation(fields: [plan_id], references: [id], onDelete: Restrict)
+  payments Payment[]
+
+  @@index([user_id])
+  @@index([plan_id])
+  @@index([status])
+  @@map("subscriptions")
+}
+
+/// Ödemeler
+model Payment {
+  id                  String          @id @default(uuid()) @db.Uuid
+  subscription_id     String          @db.Uuid
+  user_id             String          @db.Uuid
+  amount              Int             // Kuruş cinsinden
+  currency            String          @default("TRY")
+  provider            PaymentProvider
+  provider_payment_id String?
+  status              PaymentStatus   @default(PENDING)
+  paid_at             DateTime?
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // İlişkiler
+  subscription Subscription @relation(fields: [subscription_id], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([subscription_id])
+  @@index([user_id])
+  @@index([provider, provider_payment_id])
+  @@index([status])
+  @@map("payments")
+}
+
+// ============================================================================
+// DESTEK SİSTEMİ
+// ============================================================================
+
+/// Destek talepleri
+model SupportTicket {
+  id         String         @id @default(uuid()) @db.Uuid
+  user_id    String         @db.Uuid
+  company_id String?        @db.Uuid
+  subject    String
+  status     TicketStatus   @default(OPEN)
+  priority   TicketPriority @default(MEDIUM)
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // İlişkiler
+  user     User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  company  Company?         @relation(fields: [company_id], references: [id], onDelete: SetNull)
+  messages SupportMessage[]
+
+  @@index([user_id])
+  @@index([company_id])
+  @@index([status])
+  @@index([priority])
+  @@map("support_tickets")
+}
+
+/// Destek mesajları
+model SupportMessage {
+  id          String     @id @default(uuid()) @db.Uuid
+  ticket_id   String     @db.Uuid
+  sender_id   String     @db.Uuid
+  sender_type SenderType
+  message     String
+  attachments Json?      // String[] dosya URL'leri
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // İlişkiler
+  ticket SupportTicket @relation(fields: [ticket_id], references: [id], onDelete: Cascade)
+
+  @@index([ticket_id])
+  @@index([sender_id])
+  @@map("support_messages")
+}
+
+// ============================================================================
+// ADMİN PANELİ
+// ============================================================================
+
+// ============================================================================
+// TAKSİT TAKİBİ
+// ============================================================================
+
+/// Taksit planı (bir işleme bağlı taksitler)
+model InstallmentPlan {
+  id              String   @id @default(uuid()) @db.Uuid
+  company_id      String   @db.Uuid
+  account_id      String   @db.Uuid
+  transaction_id  String?  @db.Uuid
+  title           String
+  total_amount    Int      // Kuruş
+  installment_count Int
+  start_date      DateTime
+  frequency       Frequency @default(MONTHLY)
+  notes           String?
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // İlişkiler
+  company      Company       @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  account      Account       @relation(fields: [account_id], references: [id], onDelete: Cascade)
+  transaction  Transaction?  @relation(fields: [transaction_id], references: [id], onDelete: SetNull)
+  installments Installment[]
+
+  @@index([company_id])
+  @@index([account_id])
+  @@index([transaction_id])
+  @@map("installment_plans")
+}
+
+/// Tek taksit kaydı
+model Installment {
+  id                 String            @id @default(uuid()) @db.Uuid
+  plan_id            String            @db.Uuid
+  installment_number Int
+  amount             Int               // Kuruş
+  due_date           DateTime
+  paid_date          DateTime?
+  paid_amount        Int?              // Kuruş
+  status             InstallmentStatus @default(PENDING)
+  payment_method     PaymentMethod?
+  notes              String?
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // İlişkiler
+  plan InstallmentPlan @relation(fields: [plan_id], references: [id], onDelete: Cascade)
+
+  @@index([plan_id])
+  @@index([due_date])
+  @@index([status])
+  @@map("installments")
+}
+
+// ============================================================================
+// VERİ İÇE AKTARMA
+// ============================================================================
+
+/// Veri içe aktarma kayıtları
+model DataImport {
+  id            String   @id @default(uuid()) @db.Uuid
+  company_id    String   @db.Uuid
+  file_name     String
+  file_type     String   // excel, csv
+  source_app    String?  // terkon, other
+  total_rows    Int      @default(0)
+  success_rows  Int      @default(0)
+  error_rows    Int      @default(0)
+  errors        Json?    // Hata detayları
+  status        String   @default("processing") // processing, completed, failed
+  imported_by   String   @db.Uuid
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+
+  // İlişkiler
+  company Company @relation(fields: [company_id], references: [id], onDelete: Cascade)
+
+  @@index([company_id])
+  @@index([status])
+  @@map("data_imports")
+}
+
+/// Admin kullanıcıları
+model Admin {
+  id                 String    @id @default(uuid()) @db.Uuid
+  email              String    @unique
+  password_hash      String
+  first_name         String
+  last_name          String
+  role               AdminRole @default(SUPPORT)
+  is_active          Boolean   @default(true)
+  two_factor_secret  String?
+  two_factor_enabled Boolean   @default(false)
+  last_login_at      DateTime?
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // İlişkiler
+  audit_logs AdminAuditLog[]
+  user_notes UserNote[]
+
+  @@index([email])
+  @@index([is_active])
+  @@map("admins")
+}
+
+/// Admin denetim kayıtları
+model AdminAuditLog {
+  id             String  @id @default(uuid()) @db.Uuid
+  admin_id       String  @db.Uuid
+  action         String
+  target_user_id String? @db.Uuid
+  entity_type    String?
+  entity_id      String?
+  details        Json?
+  ip_address     String?
+
+  created_at DateTime @default(now())
+
+  // İlişkiler
+  admin Admin @relation(fields: [admin_id], references: [id], onDelete: Cascade)
+
+  @@index([admin_id])
+  @@index([target_user_id])
+  @@index([entity_type, entity_id])
+  @@index([created_at])
+  @@map("admin_audit_logs")
+}
+
+/// Admin tarafından kullanıcıya eklenen notlar
+model UserNote {
+  id       String @id @default(uuid()) @db.Uuid
+  user_id  String @db.Uuid
+  admin_id String @db.Uuid
+  note     String
+
+  created_at DateTime @default(now())
+
+  // İlişkiler
+  user  User  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  admin Admin @relation(fields: [admin_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([admin_id])
+  @@map("user_notes")
+}

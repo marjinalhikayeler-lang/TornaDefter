@@ -1,0 +1,147 @@
+name: TornaDefter CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # ============ BACKEND ============
+  backend-lint-test:
+    name: Backend - Lint & Test
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: tornadefter
+          POSTGRES_PASSWORD: tornadefter123
+          POSTGRES_DB: tornadefter
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: TypeScript Check
+        run: npx tsc --noEmit
+
+      - name: Run Migrations
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://tornadefter:tornadefter123@localhost:5432/tornadefter
+
+      - name: Seed Database
+        run: npx prisma db seed
+        env:
+          DATABASE_URL: postgresql://tornadefter:tornadefter123@localhost:5432/tornadefter
+
+      - name: Build
+        run: npm run build
+
+  # ============ WEB ADMIN ============
+  web-admin-build:
+    name: Web Admin - Build
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: web-admin
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: web-admin/package-lock.json
+
+      - run: npm ci --legacy-peer-deps
+
+      - name: TypeScript Check
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+
+  # ============ DOCKER ============
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    needs: [backend-lint-test, web-admin-build]
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Backend Image
+        run: docker build -t tornadefter-backend:latest ./backend
+
+      - name: Build Web Admin Image
+        run: docker build -t tornadefter-web-admin:latest ./web-admin
+
+      - name: Docker Compose Test
+        run: |
+          docker compose up -d postgres redis
+          sleep 5
+          docker compose up -d backend web-admin
+          sleep 10
+          docker compose ps
+          docker compose down
+
+  # ============ FLUTTER (sadece analiz) ============
+  flutter-analyze:
+    name: Flutter - Analyze
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: mobile
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+
+      - run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Build APK
+        run: flutter build apk --release
+
