@@ -7,6 +7,7 @@
 
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { AppController } from './app.controller';
 
 // Çekirdek modüller
 import { PrismaModule } from './prisma/prisma.module';
@@ -70,5 +71,6 @@ import { DataImportModule } from './data-import/data-import.module';
     InstallmentsModule,
     DataImportModule,
   ],
+  controllers: [AppController],
 })
 export class AppModule {}
