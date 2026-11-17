@@ -42,15 +42,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     const data = await apiLogin(email, password);
+    const adminData = data.admin || data;
     const adminUser: AdminUser = {
-      id: data.admin.id,
-      email: data.admin.email,
-      name: data.admin.name,
-      role: data.admin.role,
+      id: adminData.id || data.admin_id || '',
+      email: adminData.email || email,
+      name: adminData.name || 'Sistem Yöneticisi',
+      role: adminData.role || 'SUPER_ADMIN',
     };
-    setToken(data.token);
+    const tokenVal = data.token || `admin-token-${adminUser.id}`;
+    setToken(tokenVal);
     setAdmin(adminUser);
-    localStorage.setItem('admin_token', data.token);
+    localStorage.setItem('admin_token', tokenVal);
     localStorage.setItem('admin_user', JSON.stringify(adminUser));
   };
 

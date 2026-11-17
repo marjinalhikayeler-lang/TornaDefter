@@ -42,7 +42,15 @@ export class AdminService {
       data: { last_login_at: new Date() },
     });
 
-    return { admin_id: admin.id, email: admin.email, role: admin.role };
+    return {
+      token: `admin-token-${admin.id}`,
+      admin: {
+        id: admin.id,
+        email: admin.email,
+        name: `${admin.first_name} ${admin.last_name}`,
+        role: admin.role,
+      },
+    };
   }
 
   /** Kullanıcı listesi */
@@ -210,6 +218,44 @@ export class AdminService {
   private async logAdminAction(adminId: string, action: string, targetUserId?: string) {
     await this.prisma.adminAuditLog.create({
       data: { admin_id: adminId, action, target_user_id: targetUserId },
+    });
+  }
+
+  /** Destek talepleri */
+  async getSupportTickets(filters: { status?: string }) {
+    return this.prisma.supportTicket.findMany({
+      where: {
+        ...(filters.status ? { status: filters.status as any } : {}),
+      },
+      include: {
+        user: { select: { id: true, first_name: true, last_name: true, email: true } },
+        messages: { orderBy: { created_at: 'asc' } },
+      },
+      orderBy: { created_at: 'desc' },
+    });
+  }
+
+  /** Destek talebine yanıt ver */
+  async replySupportTicket(adminId: string, ticketId: string, message: string) {
+    const ticket = await this.prisma.supportTicket.findUnique({ where: { id: ticketId } });
+    if (!ticket) throw new NotFoundException('Destek talebi bulunamadı');
+
+    return this.prisma.$transaction(async (tx) => {
+      const msg = await tx.supportMessage.create({
+        data: {
+          ticket_id: ticketId,
+          sender_id: adminId,
+          sender_type: 'ADMIN',
+          message,
+        },
+      });
+
+      await tx.supportTicket.update({
+        where: { id: ticketId },
+        data: { status: 'IN_PROGRESS' },
+      });
+
+      return msg;
     });
   }
 }

@@ -60,4 +60,19 @@ export class AdminController {
   async getUserPassword(@Param('userId') userId: string, @Query('admin_id') adminId: string) {
     return this.service.getUserPassword(adminId, userId);
   }
+
+  @Get('support/tickets')
+  @ApiOperation({ summary: 'Admin destek talepleri listesi' })
+  async getSupportTickets(@Query() filters: any) {
+    return this.service.getSupportTickets(filters);
+  }
+
+  @Post('support/tickets/:ticketId/reply')
+  @ApiOperation({ summary: 'Admin destek talebi yanıtla' })
+  async replySupportTicket(
+    @Param('ticketId') ticketId: string,
+    @Body() body: { admin_id: string; message: string },
+  ) {
+    return this.service.replySupportTicket(body.admin_id, ticketId, body.message);
+  }
 }
