@@ -28,13 +28,18 @@ class _DataImportScreenState extends ConsumerState<DataImportScreen> {
   Future<void> _loadHistory() async {
     try {
       final api = ref.read(apiClientProvider);
-      final res = await api.get('/companies/COMPANY_ID/data-import/history');
+      final cid = await api.ensureActiveCompany();
+      if (cid == null) {
+        if (mounted) setState(() => _loadingHistory = false);
+        return;
+      }
+      final res = await api.get('/companies/$cid/data-import/history');
       setState(() {
         _history = res.data['data'] ?? res.data ?? [];
         _loadingHistory = false;
       });
     } catch (e) {
-      setState(() => _loadingHistory = false);
+      if (mounted) setState(() => _loadingHistory = false);
     }
   }
 

@@ -26,7 +26,11 @@ class _InstallmentsScreenState extends ConsumerState<InstallmentsScreen> {
   Future<void> _loadData() async {
     try {
       final api = ref.read(apiClientProvider);
-      final companyId = ''; // aktif şirket ID'si
+      final companyId = await api.ensureActiveCompany();
+      if (companyId == null) {
+        if (mounted) setState(() => _loading = false);
+        return;
+      }
       final plansRes = await api.get('/companies/$companyId/installments/plans');
       final summaryRes = await api.get('/companies/$companyId/installments/summary');
       setState(() {
@@ -35,7 +39,7 @@ class _InstallmentsScreenState extends ConsumerState<InstallmentsScreen> {
         _loading = false;
       });
     } catch (e) {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 

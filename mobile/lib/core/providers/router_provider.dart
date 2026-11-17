@@ -17,6 +17,9 @@ import '../../features/notifications/screens/notifications_screen.dart';
 import '../../features/backup/screens/backup_screen.dart';
 import '../../features/support/screens/support_screen.dart';
 import '../../features/installments/screens/installments_screen.dart';
+import '../../features/income_expense/screens/income_expense_screen.dart';
+import '../../features/data_import/screens/data_import_screen.dart';
+import '../../features/profile/screens/profile_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -103,6 +106,18 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/installments',
         builder: (context, state) => const InstallmentsScreen(),
+      ),
+      GoRoute(
+        path: '/income-expenses',
+        builder: (context, state) => const IncomeExpenseScreen(),
+      ),
+      GoRoute(
+        path: '/data-import',
+        builder: (context, state) => const DataImportScreen(),
+      ),
+      GoRoute(
+        path: '/profile',
+        builder: (context, state) => const ProfileScreen(),
       ),
     ],
   );

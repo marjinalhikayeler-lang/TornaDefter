@@ -108,6 +108,21 @@ class ApiClient {
     return _storage.read(key: 'active_company_id');
   }
 
+  Future<String?> ensureActiveCompany() async {
+    var companyId = await getActiveCompany();
+    if (companyId != null && companyId.isNotEmpty) return companyId;
+    try {
+      final res = await dio.get('/companies');
+      final list = res.data is List ? res.data : (res.data?['data'] ?? []);
+      if (list is List && list.isNotEmpty) {
+        companyId = list[0]['id'];
+        await setActiveCompany(companyId!);
+        return companyId;
+      }
+    } catch (_) {}
+    return null;
+  }
+
   Future<void> clearTokens() async {
     await _storage.deleteAll();
   }

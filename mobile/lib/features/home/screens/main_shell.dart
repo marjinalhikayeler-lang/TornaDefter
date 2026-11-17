@@ -12,14 +12,9 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
 
-  final _routes = ['/home', '/accounts', '/cash', '/reports', '/more'];
+  final _routes = ['/home', '/accounts', '/cash', '/more'];
 
   void _onTap(int index) {
-    if (index == 2) {
-      // Ortadaki + butonu - FAB action sheet
-      _showAddSheet();
-      return;
-    }
     setState(() => _currentIndex = index);
     context.go(_routes[index]);
   }
@@ -34,13 +29,15 @@ class _MainShellState extends State<MainShell> {
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.cardDark, borderRadius: BorderRadius.circular(2))),
           const SizedBox(height: 20),
-          const Text('Hızlı İşlem', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-          const SizedBox(height: 20),
-          _actionTile(Icons.person_add, 'Yeni Cari Ekle', AppColors.primary, () { Navigator.pop(ctx); context.go('/accounts/new'); }),
-          _actionTile(Icons.add_circle, 'Borç Ekle', AppColors.danger, () { Navigator.pop(ctx); context.go('/transactions/new?type=SALE'); }),
-          _actionTile(Icons.download, 'Tahsilat Al', AppColors.success, () { Navigator.pop(ctx); context.go('/transactions/new?type=COLLECTION'); }),
-          _actionTile(Icons.upload, 'Ödeme Yap', AppColors.warning, () { Navigator.pop(ctx); context.go('/transactions/new?type=PAYMENT'); }),
-          _actionTile(Icons.swap_horiz, 'Transfer', AppColors.info, () { Navigator.pop(ctx); }),
+          const Text('Hızlı İşlem Ekle', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+          const SizedBox(height: 16),
+          _actionTile(Icons.person_add, 'Yeni Cari Ekle', AppColors.primary, () { Navigator.pop(ctx); context.push('/accounts/new'); }),
+          _actionTile(Icons.add_circle, 'Borç Ekle (Satış)', AppColors.danger, () { Navigator.pop(ctx); context.push('/transactions/new?type=SALE'); }),
+          _actionTile(Icons.download, 'Tahsilat Al', AppColors.success, () { Navigator.pop(ctx); context.push('/transactions/new?type=COLLECTION'); }),
+          _actionTile(Icons.shopping_cart, 'Alacak Ekle (Alış)', AppColors.warning, () { Navigator.pop(ctx); context.push('/transactions/new?type=PURCHASE'); }),
+          _actionTile(Icons.upload, 'Ödeme Yap', AppColors.accent, () { Navigator.pop(ctx); context.push('/transactions/new?type=PAYMENT'); }),
+          _actionTile(Icons.description, 'Çek / Senet Ekle', AppColors.info, () { Navigator.pop(ctx); context.push('/cheques'); }),
+          _actionTile(Icons.category, 'Gelir / Gider Ekle', Colors.purple, () { Navigator.pop(ctx); context.push('/income-expenses'); }),
           const SizedBox(height: 10),
         ]),
       ),
@@ -82,8 +79,8 @@ class _MainShellState extends State<MainShell> {
               _navItem(Icons.home, 'Ana Sayfa', 0),
               _navItem(Icons.people, 'Cariler', 1),
               const SizedBox(width: 48), // FAB boşluğu
-              _navItem(Icons.account_balance_wallet, 'Kasa', 3),
-              _navItem(Icons.more_horiz, 'Daha Fazla', 4),
+              _navItem(Icons.account_balance_wallet, 'Kasa', 2),
+              _navItem(Icons.more_horiz, 'Daha Fazla', 3),
             ],
           ),
         ),
