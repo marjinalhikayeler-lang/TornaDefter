@@ -7,7 +7,6 @@
 
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { BullModule } from '@nestjs/bull';
 
 // Çekirdek modüller
 import { PrismaModule } from './prisma/prisma.module';
@@ -41,16 +40,6 @@ import { DataImportModule } from './data-import/data-import.module';
     ConfigModule.forRoot({
       isGlobal: true, // Tüm modüllerde erişilebilir
       envFilePath: ['.env.local', '.env'],
-    }),
-
-    // ============================================
-    // Bull kuyruk yapılandırması (Redis bağlantısı)
-    // ============================================
-    BullModule.forRoot({
-      redis: {
-        host: process.env.REDIS_HOST || 'localhost',
-        port: parseInt(process.env.REDIS_PORT || '6379', 10),
-      },
     }),
 
     // ============================================

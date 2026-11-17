@@ -1,5 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+final apiClientProvider = Provider<ApiClient>((ref) => ApiClient());
 
 class ApiClient {
   static const String baseUrl = 'http://10.0.2.2:3000/api/v1'; // Android emulator
@@ -82,6 +85,22 @@ class ApiClient {
   Future<bool> hasToken() async {
     final token = await _storage.read(key: 'access_token');
     return token != null;
+  }
+
+  Future<Response<T>> get<T>(String path, {Map<String, dynamic>? queryParameters}) {
+    return dio.get<T>(path, queryParameters: queryParameters);
+  }
+
+  Future<Response<T>> post<T>(String path, {dynamic data, Map<String, dynamic>? queryParameters}) {
+    return dio.post<T>(path, data: data, queryParameters: queryParameters);
+  }
+
+  Future<Response<T>> put<T>(String path, {dynamic data, Map<String, dynamic>? queryParameters}) {
+    return dio.put<T>(path, data: data, queryParameters: queryParameters);
+  }
+
+  Future<Response<T>> delete<T>(String path, {dynamic data, Map<String, dynamic>? queryParameters}) {
+    return dio.delete<T>(path, data: data, queryParameters: queryParameters);
   }
 }
 

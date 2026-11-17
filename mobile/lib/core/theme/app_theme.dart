@@ -35,6 +35,13 @@ class AppColors {
 
   // FAB turuncu (OkLif stili)
   static const Color fab = Color(0xFFFF8C00);
+
+  // Kolay erişim aliasları
+  static const Color darkBg = backgroundDark;
+  static const Color darkSurface = surfaceDark;
+  static const Color creditGreen = credit;
+  static const Color debitRed = debit;
+  static const Color accentOrange = fab;
 }
 
 class AppTheme {

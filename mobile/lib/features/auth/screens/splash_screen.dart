@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../core/theme/app_theme.dart';
-import '../../core/api/api_client.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/api/api_client.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -32,14 +32,18 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              width: 120, height: 120,
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: const Center(
-                child: Text('TD', style: TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.white)),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: Image.asset(
+                'assets/images/logo.png',
+                width: 130,
+                height: 130,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  width: 120, height: 120,
+                  decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(24)),
+                  child: const Center(child: Text('TD', style: TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.white))),
+                ),
               ),
             ),
             const SizedBox(height: 24),

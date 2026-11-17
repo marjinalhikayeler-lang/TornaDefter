@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import '../../../core/theme/app_theme.dart';
-import '../../../core/utils/formatters.dart';
 
 /// Rapor Export & Print Yardımcı Sınıfı
 class ReportExportUtil {

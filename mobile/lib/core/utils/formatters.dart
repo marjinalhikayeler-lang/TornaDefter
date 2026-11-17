@@ -52,6 +52,22 @@ class DateUtil {
     return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
   }
 
+  /// Tarih formatla: "17.11.2026"
+  static String format(DateTime date) => formatDot(date);
+
+  /// Tarih ve saat formatla: "17.11.2026 14:30:00"
+  static String formatDateTime(dynamic date) {
+    if (date == null) return '';
+    DateTime? d;
+    if (date is DateTime) {
+      d = date;
+    } else if (date is String) {
+      d = DateTime.tryParse(date);
+    }
+    if (d == null) return date.toString();
+    return '${formatDot(d)} ${formatTime(d)}';
+  }
+
   /// Saat formatla: "17:50:00"
   static String formatTime(DateTime date) {
     return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}:${date.second.toString().padLeft(2, '0')}';

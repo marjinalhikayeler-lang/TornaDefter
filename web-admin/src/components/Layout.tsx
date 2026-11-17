@@ -30,9 +30,7 @@ export default function Layout() {
         {/* Logo */}
         <div className="px-6 py-5 border-b border-slate-700">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary-600 rounded-xl flex items-center justify-center font-bold text-lg">
-              TD
-            </div>
+            <img src="/logo.png" alt="TornaDefter" className="w-10 h-10 rounded-lg object-cover border border-slate-600" />
             <div>
               <h1 className="text-lg font-bold text-white">TornaDefter</h1>
               <p className="text-xs text-slate-400">Yönetim Paneli</p>

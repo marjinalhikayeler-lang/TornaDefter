@@ -27,7 +27,7 @@ async function bootstrap() {
   // CORS yapılandırması - Çapraz kaynak isteklerine izin ver
   // ============================================
   app.enableCors({
-    origin: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3001'],
+    origin: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Company-Id'],
