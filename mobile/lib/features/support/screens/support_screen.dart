@@ -212,7 +212,7 @@ class _CreateTicketSheetState extends State<_CreateTicketSheet> {
                   }
                   setState(() => _loading = true);
                   try {
-                    final api = ref.read(apiClientProvider);
+                    final api = ApiClient();
                     final cid = await api.ensureActiveCompany();
                     await api.post('/support/tickets', data: {
                       'subject': _subjectCtrl.text.trim(),
