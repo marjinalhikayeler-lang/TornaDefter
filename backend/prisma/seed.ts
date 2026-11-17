@@ -6,6 +6,18 @@
  */
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import * as crypto from 'crypto';
+
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'tornadefter_default_key_32chars!';
+
+function encryptPassword(password: string): string {
+  const iv = crypto.randomBytes(16);
+  const key = Buffer.from(ENCRYPTION_KEY.padEnd(32, '0').slice(0, 32));
+  const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+  let encrypted = cipher.update(password);
+  encrypted = Buffer.concat([encrypted, cipher.final()]);
+  return iv.toString('hex') + ':' + encrypted.toString('hex');
+}
 
 const prisma = new PrismaClient();
 
@@ -82,13 +94,17 @@ async function main() {
 
   // ============ TEST KULLANICISI ============
   const testPassword = await bcrypt.hash('Test1234', 12);
+  const testPasswordEncrypted = encryptPassword('Test1234');
   const testUser = await prisma.user.upsert({
     where: { email: 'test@tornadefter.com' },
-    update: {},
+    update: {
+      password_encrypted: testPasswordEncrypted,
+    },
     create: {
       email: 'test@tornadefter.com',
       phone: '+905551234567',
       password_hash: testPassword,
+      password_encrypted: testPasswordEncrypted,
       first_name: 'Test',
       last_name: 'Kullanıcı',
       email_verified: true,
