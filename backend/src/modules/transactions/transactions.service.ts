@@ -27,63 +27,64 @@ export class TransactionsService {
    * - Ödeme Yap
    * Her birinde ödeme yöntemi seçilebilir
    */
-  async create(companyId: string, userId: string, data: {
-    account_id: string;
-    type: TransactionType;
-    amount: number; // Kuruş
-    description?: string;
-    document_number?: string;
-    date: string;
-    time?: string;
-    due_date?: string;
-    payment_method?: PaymentMethod;
-    cash_account_id?: string;
-    bank_account_id?: string;
-    credit_card_account_id?: string;
-    category_id?: string;
-    notes?: string;
-    idempotency_key?: string;
-  }) {
-    if (data.amount <= 0) {
+  async create(companyId: string, userId: string, data: any) {
+    const accountId = data.account_id || data.accountId;
+    const type = data.type as TransactionType;
+    const amount = Number(data.amount) || 0;
+    const description = data.description || null;
+    const documentNumber = data.document_number || data.documentNumber;
+    const date = data.date;
+    const dueDate = data.due_date || data.dueDate;
+    const paymentMethod = (data.payment_method || data.paymentMethod || 'CASH') as PaymentMethod;
+    const cashAccountId = data.cash_account_id || data.cashAccountId || null;
+    const bankAccountId = data.bank_account_id || data.bankAccountId || null;
+    const categoryId = data.category_id || data.categoryId || null;
+    const notes = data.notes || null;
+    const idempotencyKey = data.idempotency_key || data.idempotencyKey;
+
+    if (amount <= 0) {
       throw new BadRequestException('Tutar sıfırdan büyük olmalıdır.');
     }
 
+    if (!accountId) {
+      throw new BadRequestException('Cari hesap (accountId) seçilmelidir.');
+    }
+
     // İdempotency kontrolü
-    if (data.idempotency_key) {
+    if (idempotencyKey) {
       const existing = await this.prisma.transaction.findUnique({
-        where: { idempotency_key: data.idempotency_key },
+        where: { idempotency_key: idempotencyKey },
       });
       if (existing) return existing;
     }
 
     // Cari kontrolü
     const account = await this.prisma.account.findFirst({
-      where: { id: data.account_id, company_id: companyId, deleted_at: null },
+      where: { id: accountId, company_id: companyId, deleted_at: null },
     });
     if (!account) throw new NotFoundException('Cari hesap bulunamadı.');
 
     // Risk limiti kontrolü (borçlandırma işlemlerinde)
-    if (['SALE', 'PURCHASE'].includes(data.type) && account.risk_limit) {
-      const currentBalance = await this.calculateRunningBalance(data.account_id);
-      if (currentBalance + data.amount > account.risk_limit) {
-        this.logger.warn(`Risk limiti uyarısı: ${account.title} - Limit: ${account.risk_limit}, Yeni bakiye: ${currentBalance + data.amount}`);
-        // Engellemiyoruz, sadece uyarı
+    if (['SALE', 'PURCHASE'].includes(type) && account.risk_limit) {
+      const currentBalance = await this.calculateRunningBalance(accountId);
+      if (currentBalance + amount > account.risk_limit) {
+        this.logger.warn(`Risk limiti uyarısı: ${account.title} - Limit: ${account.risk_limit}, Yeni bakiye: ${currentBalance + amount}`);
       }
     }
 
     // Mükerrer kontrolü (aynı cari, tutar, tarih)
     const duplicate = await this.prisma.transaction.findFirst({
       where: {
-        account_id: data.account_id,
-        amount: data.amount,
-        date: new Date(data.date),
-        type: data.type,
+        account_id: accountId,
+        amount: amount,
+        date: new Date(date),
+        type: type,
         deleted_at: null,
         created_at: { gte: new Date(Date.now() - 60000) }, // Son 1 dakika
       },
     });
     if (duplicate) {
-      this.logger.warn(`Mükerrer hareket uyarısı: ${account.title} - ${data.amount}`);
+      this.logger.warn(`Mükerrer hareket uyarısı: ${account.title} - ${amount}`);
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -91,35 +92,35 @@ export class TransactionsService {
       const transaction = await tx.transaction.create({
         data: {
           company_id: companyId,
-          account_id: data.account_id,
-          type: data.type,
-          amount: data.amount,
-          description: data.description,
-          document_number: data.document_number || await this.generateDocumentNumber(companyId),
-          date: new Date(data.date),
-          due_date: data.due_date ? new Date(data.due_date) : null,
-          payment_method: data.payment_method,
-          cash_account_id: data.cash_account_id,
-          bank_account_id: data.bank_account_id,
-          category_id: data.category_id,
-          notes: data.notes,
-          idempotency_key: data.idempotency_key || uuidv4(),
+          account_id: accountId,
+          type: type,
+          amount: amount,
+          description: description,
+          document_number: documentNumber || await this.generateDocumentNumber(companyId),
+          date: new Date(date),
+          due_date: dueDate ? new Date(dueDate) : null,
+          payment_method: paymentMethod,
+          cash_account_id: cashAccountId,
+          bank_account_id: bankAccountId,
+          category_id: categoryId,
+          notes: notes,
+          idempotency_key: idempotencyKey || uuidv4(),
           created_by: userId,
           running_balance: 0, // Sonra hesaplanacak
         },
       });
 
       // Yürüyen bakiyeyi güncelle
-      const newBalance = await this.recalculateRunningBalances(tx, data.account_id);
+      const newBalance = await this.recalculateRunningBalances(tx, accountId);
 
       // Kasa/Banka bakiyesini güncelle
-      if (data.payment_method === 'CASH' && data.cash_account_id) {
-        await this.updateCashBalance(tx, data.cash_account_id, data.type, data.amount);
+      if (paymentMethod === 'CASH' && cashAccountId) {
+        await this.updateCashBalance(tx, cashAccountId, type, amount);
       } else if (
-        (data.payment_method === 'BANK_TRANSFER' || data.payment_method === 'CREDIT_CARD') &&
-        data.bank_account_id
+        (paymentMethod === 'BANK_TRANSFER' || paymentMethod === 'CREDIT_CARD') &&
+        bankAccountId
       ) {
-        await this.updateBankBalance(tx, data.bank_account_id, data.type, data.amount);
+        await this.updateBankBalance(tx, bankAccountId, type, amount);
       }
 
       // Denetim kaydı

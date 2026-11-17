@@ -6,45 +6,45 @@ import { IncomeExpenseType } from '@prisma/client';
 export class IncomeExpensesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(companyId: string, userId: string, data: {
-    type: IncomeExpenseType;
-    categoryId?: string;
-    cashAccountId?: string;
-    bankAccountId?: string;
-    amount: number;
-    currency?: string;
-    date: string;
-    description?: string;
-    documentNumber?: string;
-  }) {
+  async create(companyId: string, userId: string, data: any) {
+    const type = data.type as IncomeExpenseType;
+    const amount = Number(data.amount) || 0;
+    const rawDate = data.date;
+    const date = rawDate ? new Date(rawDate) : new Date();
+    const description = data.description || null;
+    const documentNumber = data.documentNumber || data.document_number || null;
+    const cashAccountId = data.cashAccountId || data.cash_account_id || null;
+    const bankAccountId = data.bankAccountId || data.bank_account_id || null;
+    const categoryId = data.categoryId || data.category_id || null;
+
     return this.prisma.$transaction(async (tx) => {
       const record = await tx.incomeExpense.create({
         data: {
           company_id: companyId,
-          type: data.type,
-          category_id: data.categoryId || null,
-          cash_account_id: data.cashAccountId || null,
-          bank_account_id: data.bankAccountId || null,
-          amount: data.amount,
+          type,
+          category_id: categoryId,
+          cash_account_id: cashAccountId,
+          bank_account_id: bankAccountId,
+          amount,
           currency: data.currency || 'TRY',
-          date: new Date(data.date),
-          description: data.description || null,
-          document_number: data.documentNumber || null,
+          date: !isNaN(date.getTime()) ? date : new Date(),
+          description,
+          document_number: documentNumber,
           created_by: userId,
         },
       });
 
       // Kasa/banka bakiyesini güncelle
-      const balanceChange = data.type === 'INCOME' ? data.amount : -data.amount;
-      if (data.cashAccountId) {
+      const balanceChange = type === 'INCOME' ? amount : -amount;
+      if (cashAccountId) {
         await tx.cashAccount.update({
-          where: { id: data.cashAccountId },
+          where: { id: cashAccountId },
           data: { current_balance: { increment: balanceChange } },
         });
       }
-      if (data.bankAccountId) {
+      if (bankAccountId) {
         await tx.bankAccount.update({
-          where: { id: data.bankAccountId },
+          where: { id: bankAccountId },
           data: { current_balance: { increment: balanceChange } },
         });
       }

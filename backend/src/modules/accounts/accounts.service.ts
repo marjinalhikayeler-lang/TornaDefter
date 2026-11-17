@@ -41,40 +41,46 @@ export class AccountsService {
     opening_date?: string;
     group_id?: string;
   }) {
+    const accountType = data.account_type || (data as any).accountType || 'CUSTOMER';
+    const taxNumber = data.tax_number || (data as any).taxNumber;
+    const taxOffice = data.tax_office || (data as any).taxOffice;
+    const openingBalance = data.opening_balance ?? (data as any).openingBalance ?? 0;
+    const openingBalanceDirection = data.opening_balance_direction || (data as any).openingBalanceDirection || 'DEBIT';
+
     // Mükerrer kontrolü (telefon veya vergi no)
-    if (data.tax_number) {
+    if (taxNumber) {
       const existing = await this.prisma.account.findFirst({
-        where: { company_id: companyId, tax_number: data.tax_number, deleted_at: null },
+        where: { company_id: companyId, tax_number: taxNumber, deleted_at: null },
       });
       if (existing) {
-        this.logger.warn(`Mükerrer vergi no uyarısı: ${data.tax_number}`);
+        this.logger.warn(`Mükerrer vergi no uyarısı: ${taxNumber}`);
       }
     }
 
     // Otomatik cari kodu üret
-    const code = await this.generateCode(companyId, data.account_type);
+    const code = await this.generateCode(companyId, accountType);
 
     return this.prisma.account.create({
       data: {
         company_id: companyId,
         code,
         title: data.title.trim(),
-        account_type: data.account_type,
+        account_type: accountType,
         authorized_person: data.authorized_person,
-        phones: data.phones,
+        phones: data.phones || ((data as any).phone ? [(data as any).phone] : undefined),
         email: data.email,
         address: data.address,
         city: data.city,
         district: data.district,
-        tax_office: data.tax_office,
-        tax_number: data.tax_number,
+        tax_office: taxOffice,
+        tax_number: taxNumber,
         identity_number: data.identity_number,
         notes: data.notes,
         risk_limit: data.risk_limit,
         default_due_days: data.default_due_days,
         currency: data.currency || 'TRY',
-        opening_balance: data.opening_balance || 0,
-        opening_balance_direction: data.opening_balance_direction || 'DEBIT',
+        opening_balance: openingBalance,
+        opening_balance_direction: openingBalanceDirection,
         opening_date: data.opening_date ? new Date(data.opening_date) : null,
         group_id: data.group_id,
       },

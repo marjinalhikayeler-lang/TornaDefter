@@ -47,30 +47,54 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
   }
 
   Future<void> _save() async {
-    if (_titleCtrl.text.trim().isEmpty) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ünvan zorunludur'))); return; }
+    if (_titleCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ünvan / Ad Soyad zorunludur')));
+      return;
+    }
     setState(() => _loading = true);
-    final companyId = await ApiClient().getActiveCompany();
-    if (companyId == null) return;
+    final companyId = await ApiClient().ensureActiveCompany();
+    if (companyId == null) {
+      if (mounted) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Aktif firma bulunamadı. Lütfen tekrar giriş yapın.')));
+      }
+      return;
+    }
     final data = {
       'title': _titleCtrl.text.trim(),
+      'account_type': _type,
       'accountType': _type,
       'phone': _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
+      'phones': _phoneCtrl.text.trim().isEmpty ? null : [_phoneCtrl.text.trim()],
       'email': _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
       'address': _addressCtrl.text.trim().isEmpty ? null : _addressCtrl.text.trim(),
+      'tax_office': _taxOfficeCtrl.text.trim().isEmpty ? null : _taxOfficeCtrl.text.trim(),
       'taxOffice': _taxOfficeCtrl.text.trim().isEmpty ? null : _taxOfficeCtrl.text.trim(),
+      'tax_number': _taxNoCtrl.text.trim().isEmpty ? null : _taxNoCtrl.text.trim(),
       'taxNumber': _taxNoCtrl.text.trim().isEmpty ? null : _taxNoCtrl.text.trim(),
       'notes': _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
+      'opening_balance': int.tryParse(_openingBalCtrl.text) ?? 0,
       'openingBalance': int.tryParse(_openingBalCtrl.text) ?? 0,
+      'opening_balance_direction': _balDir,
       'openingBalanceDirection': _balDir,
     };
     try {
-      if (_isEdit) { await ApiClient().dio.put('/companies/$companyId/accounts/${widget.accountId}', data: data); }
-      else { await ApiClient().dio.post('/companies/$companyId/accounts', data: data); }
-      if (mounted) context.pop();
+      if (_isEdit) {
+        await ApiClient().dio.put('/companies/$companyId/accounts/${widget.accountId}', data: data);
+      } else {
+        await ApiClient().dio.post('/companies/$companyId/accounts', data: data);
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cari hesap başarıyla kaydedildi')));
+        context.pop();
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Hata: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Kayıt hatası: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
-    setState(() => _loading = false);
   }
 
   @override

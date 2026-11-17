@@ -9,14 +9,15 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class CashAccountsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(companyId: string, data: { name: string; currency?: string; opening_balance?: number }) {
+  async create(companyId: string, data: any) {
+    const openingBalance = Number(data.opening_balance ?? data.openingBalance) || 0;
     return this.prisma.cashAccount.create({
       data: {
         company_id: companyId,
         name: data.name,
         currency: data.currency || 'TRY',
-        opening_balance: data.opening_balance || 0,
-        current_balance: data.opening_balance || 0,
+        opening_balance: openingBalance,
+        current_balance: openingBalance,
       },
     });
   }

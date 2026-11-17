@@ -23,26 +23,17 @@ class _AccountsListScreenState extends State<AccountsListScreen> {
   Future<void> _loadAccounts() async {
     setState(() => _loading = true);
     try {
-      var companyId = await ApiClient().getActiveCompany();
-      if (companyId == null) {
-        final compRes = await ApiClient().dio.get('/companies').catchError((_) => null);
-        if (compRes != null && compRes.data != null) {
-          final list = compRes.data is List ? compRes.data : (compRes.data['data'] ?? []);
-          if (list is List && list.isNotEmpty) {
-            companyId = list[0]['id'];
-            await ApiClient().setActiveCompany(companyId!);
-          }
-        }
-      }
+      final companyId = await ApiClient().ensureActiveCompany();
       if (companyId == null) {
         if (mounted) setState(() { _accounts = []; _loading = false; });
         return;
       }
       final res = await ApiClient().dio.get('/companies/$companyId/accounts', queryParameters: {
         if (_searchQuery.isNotEmpty) 'search': _searchQuery,
-        if (_filter != 'ALL') 'type': _filter,
+        if (_filter != 'ALL') 'account_type': _filter,
       });
-      if (mounted) setState(() { _accounts = res.data['data'] ?? res.data ?? []; _loading = false; });
+      final list = res.data is List ? res.data : (res.data?['data'] ?? []);
+      if (mounted) setState(() { _accounts = list as List; _loading = false; });
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
@@ -60,7 +51,13 @@ class _AccountsListScreenState extends State<AccountsListScreen> {
         title: const Text('Cariler'),
         actions: [
           IconButton(icon: const Icon(Icons.filter_list), onPressed: _showFilterSheet),
-          IconButton(icon: const Icon(Icons.add), onPressed: () => context.go('/accounts/new')),
+          IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: () async {
+              await context.push('/accounts/new');
+              _loadAccounts();
+            },
+          ),
         ],
       ),
       body: Column(children: [
@@ -110,7 +107,10 @@ class _AccountsListScreenState extends State<AccountsListScreen> {
                       final a = _accounts[i];
                       final balance = (a['current_balance'] ?? a['opening_balance'] ?? 0) as int;
                       return ListTile(
-                        onTap: () => context.go('/accounts/${a['id']}'),
+                        onTap: () async {
+                          await context.push('/accounts/${a['id']}');
+                          _loadAccounts();
+                        },
                         title: Text(a['title'] ?? '', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                         subtitle: Row(children: [
                           Container(

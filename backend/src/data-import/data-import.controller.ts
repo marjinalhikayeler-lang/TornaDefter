@@ -4,11 +4,12 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { DataImportService } from './data-import.service';
+import { AuthGuard } from '@nestjs/passport';
 import { CompanyGuard } from '../common/guards/company.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @Controller('companies/:companyId/data-import')
-@UseGuards(CompanyGuard)
+@UseGuards(AuthGuard('jwt'), CompanyGuard)
 export class DataImportController {
   constructor(private svc: DataImportService) {}
 

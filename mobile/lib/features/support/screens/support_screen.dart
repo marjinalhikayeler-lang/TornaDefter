@@ -300,54 +300,77 @@ class _TicketDetailScreenState extends State<_TicketDetailScreen> {
       ),
       body: Column(
         children: [
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(12),
-              itemCount: _messages.length + 1,
-              itemBuilder: (context, i) {
-                if (i == 0) {
-                  return Card(
-                    color: AppColors.darkSurface,
-                    child: Padding(
-                      padding: const EdgeInsets.all(14),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(widget.ticket['subject'] ?? '', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                          const SizedBox(height: 8),
-                          Text(widget.ticket['message'] ?? '', style: const TextStyle(color: Colors.white70)),
-                          const SizedBox(height: 8),
-                          Text(DateUtil.formatDateTime(widget.ticket['created_at'] ?? ''), style: const TextStyle(color: Colors.white38, fontSize: 11)),
-                        ],
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            color: AppColors.darkSurface,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        widget.ticket['subject'] ?? '',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
                       ),
                     ),
-                  );
-                }
-                final m = _messages[i - 1];
-                final isAdmin = m['sender_type'] == 'ADMIN';
-                return Align(
-                  alignment: isAdmin ? Alignment.centerLeft : Alignment.centerRight,
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        widget.ticket['status'] ?? 'Açık',
+                        style: const TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  DateUtil.formatDateTime(widget.ticket['created_at'] ?? ''),
+                  style: const TextStyle(color: Colors.white38, fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: _messages.isEmpty
+                ? const Center(child: Text('Mesaj yok', style: TextStyle(color: Colors.white38)))
+                : ListView.builder(
                     padding: const EdgeInsets.all(12),
-                    constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-                    decoration: BoxDecoration(
-                      color: isAdmin ? AppColors.primary.withOpacity(0.15) : AppColors.darkSurface,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(m['message'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 14)),
-                        const SizedBox(height: 4),
-                        Text(
-                          isAdmin ? 'Destek Ekibi' : 'Siz',
-                          style: TextStyle(color: isAdmin ? AppColors.primary : Colors.white38, fontSize: 11),
+                    itemCount: _messages.length,
+                    itemBuilder: (context, i) {
+                      final m = _messages[i];
+                      final isAdmin = m['sender_type'] == 'ADMIN';
+                      return Align(
+                        alignment: isAdmin ? Alignment.centerLeft : Alignment.centerRight,
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.all(12),
+                          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+                          decoration: BoxDecoration(
+                            color: isAdmin ? AppColors.primary.withOpacity(0.2) : AppColors.darkSurface,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(m['message'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 14)),
+                              const SizedBox(height: 4),
+                              Text(
+                                isAdmin ? 'Destek Ekibi' : 'Siz',
+                                style: TextStyle(color: isAdmin ? AppColors.primary : Colors.white38, fontSize: 11),
+                              ),
+                            ],
+                          ),
                         ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
-                );
+          ),
               },
             ),
           ),

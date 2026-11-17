@@ -2,11 +2,12 @@ import {
   Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards,
 } from '@nestjs/common';
 import { InstallmentsService } from './installments.service';
+import { AuthGuard } from '@nestjs/passport';
 import { CompanyGuard } from '../common/guards/company.guard';
 import { Frequency, PaymentMethod } from '@prisma/client';
 
 @Controller('companies/:companyId/installments')
-@UseGuards(CompanyGuard)
+@UseGuards(AuthGuard('jwt'), CompanyGuard)
 export class InstallmentsController {
   constructor(private svc: InstallmentsService) {}
 

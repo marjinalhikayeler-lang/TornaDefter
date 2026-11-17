@@ -66,28 +66,49 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
 
   Future<void> _save() async {
     final amount = double.tryParse(_amountCtrl.text.replaceAll(',', '.'));
-    if (amount == null || amount <= 0) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Geçerli bir tutar girin'))); return; }
-    if (_accountId == null) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cari seçin'))); return; }
+    if (amount == null || amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Geçerli bir tutar girin')));
+      return;
+    }
+    if (_accountId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Lütfen bir cari hesap seçin veya yeni cari ekleyin')));
+      return;
+    }
 
     setState(() => _loading = true);
-    final companyId = await ApiClient().getActiveCompany();
-    if (companyId == null) return;
+    final companyId = await ApiClient().ensureActiveCompany();
+    if (companyId == null) {
+      if (mounted) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Aktif firma bulunamadı. Lütfen tekrar giriş yapın.')));
+      }
+      return;
+    }
 
     try {
       await ApiClient().dio.post('/companies/$companyId/transactions', data: {
         'accountId': _accountId,
+        'account_id': _accountId,
         'type': _type,
         'amount': MoneyUtil.toKurus(amount),
         'date': _date.toIso8601String().split('T')[0],
         'description': _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
         'documentNumber': _docNoCtrl.text.trim().isEmpty ? null : _docNoCtrl.text.trim(),
+        'document_number': _docNoCtrl.text.trim().isEmpty ? null : _docNoCtrl.text.trim(),
         'paymentMethod': _paymentMethod,
+        'payment_method': _paymentMethod,
       });
-      if (mounted) context.pop();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('İşlem başarıyla kaydedildi')));
+        context.pop();
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Hata: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Hata: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
-    setState(() => _loading = false);
   }
 
   @override
@@ -98,7 +119,45 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
         IconButton(icon: const Icon(Icons.save), onPressed: _loading ? null : _save),
       ]),
       body: SingleChildScrollView(padding: const EdgeInsets.all(16), child: Column(children: [
-        if (_accounts.isNotEmpty) ...[
+        if (_accounts.isEmpty) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.cardDark,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.warning.withOpacity(0.5)),
+            ),
+            child: Column(
+              children: [
+                const Icon(Icons.info_outline, color: AppColors.warning, size: 36),
+                const SizedBox(height: 8),
+                const Text(
+                  'Henüz kayıtlı bir cari hesabınız bulunmuyor.',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'İşlem (Borç / Tahsilat / Alacak) eklemek için önce bir cari hesap oluşturmalısınız.',
+                  style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 12),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    await context.push('/accounts/new');
+                    _loadAccounts();
+                  },
+                  icon: const Icon(Icons.person_add),
+                  label: const Text('Yeni Cari Hesap Ekle'),
+                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ] else ...[
           DropdownButtonFormField<String>(
             value: _accountId,
             dropdownColor: AppColors.surfaceDark,

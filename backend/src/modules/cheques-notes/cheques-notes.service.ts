@@ -11,23 +11,28 @@ export class ChequesNotesService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(companyId: string, data: any) {
+    const rawDueDate = data.due_date || data.dueDate;
+    const rawIssueDate = data.issue_date || data.issueDate;
+    const dueDate = rawDueDate ? new Date(rawDueDate) : new Date(Date.now() + 30 * 86400000);
+    const issueDate = rawIssueDate ? new Date(rawIssueDate) : null;
+
     return this.prisma.chequeNote.create({
       data: {
         company_id: companyId,
-        type: data.type,
-        direction: data.direction,
-        amount: data.amount,
+        type: data.type || 'CHEQUE',
+        direction: data.direction || 'RECEIVED',
+        amount: Number(data.amount) || 0,
         currency: data.currency || 'TRY',
-        issue_date: data.issue_date ? new Date(data.issue_date) : null,
-        due_date: new Date(data.due_date),
-        cheque_number: data.cheque_number,
-        bank_name: data.bank_name,
-        branch_name: data.branch_name,
-        drawer: data.drawer,
-        related_account_id: data.related_account_id,
-        description: data.description,
-        photo_url: data.photo_url,
-        status: 'IN_PORTFOLIO',
+        issue_date: issueDate && !isNaN(issueDate.getTime()) ? issueDate : null,
+        due_date: !isNaN(dueDate.getTime()) ? dueDate : new Date(),
+        cheque_number: data.cheque_number || data.chequeNumber || null,
+        bank_name: data.bank_name || data.bankName || null,
+        branch_name: data.branch_name || data.branchName || null,
+        drawer: data.drawer || 'Bilinmeyen',
+        related_account_id: data.related_account_id || data.relatedAccountId || null,
+        description: data.description || null,
+        photo_url: data.photo_url || data.photoUrl || null,
+        status: data.status || 'IN_PORTFOLIO',
       },
     });
   }

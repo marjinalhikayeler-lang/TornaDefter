@@ -11,6 +11,12 @@ import { CompanyGuard } from '../../common/guards/company.guard';
 export class ReportsController {
   constructor(private readonly service: ReportsService) {}
 
+  @Get('dashboard-summary')
+  @ApiOperation({ summary: 'Ana menü dashboard finansal özeti' })
+  async dashboardSummary(@Param('companyId') cid: string) {
+    return this.service.getDashboardSummary(cid);
+  }
+
   @Get('account-balance')
   @ApiOperation({ summary: 'Cari bakiye raporu' })
   async accountBalance(@Param('companyId') cid: string, @Query() f: any) {

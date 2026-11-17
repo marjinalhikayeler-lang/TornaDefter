@@ -136,7 +136,28 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> with SingleTi
             onPressed: () => _showAddTransaction(),
             child: const Icon(Icons.add, size: 28),
           ),
-          IconButton(icon: const Icon(Icons.phone, color: AppColors.success), onPressed: () {}),
+          IconButton(
+            icon: const Icon(Icons.phone, color: AppColors.success),
+            onPressed: () {
+              final phones = _account?['phones'];
+              final phone = (phones is List && phones.isNotEmpty) ? phones.first.toString() : phones?.toString();
+              if (phone == null || phone.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bu caride kayıtlı telefon numarası bulunamadı')));
+                return;
+              }
+              showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  backgroundColor: AppColors.surfaceDark,
+                  title: const Text('Telefon Numarası', style: TextStyle(color: Colors.white)),
+                  content: Text(phone, style: const TextStyle(color: Colors.white70, fontSize: 18)),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Kapat')),
+                  ],
+                ),
+              );
+            },
+          ),
         ]),
       ),
     );
@@ -206,20 +227,122 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> with SingleTi
     ElevatedButton.icon(onPressed: () {}, icon: const Icon(Icons.message), label: const Text('WhatsApp Gönder'), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366))),
   ]));
 
-  void _showOptions() {}
-  void _showAddTransaction() {
-    showModalBottomSheet(context: context, backgroundColor: AppColors.surfaceDark,
+  void _showOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surfaceDark,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
-        const Text('İşlem Ekle', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-        const SizedBox(height: 16),
-        ListTile(leading: const Icon(Icons.add_circle, color: AppColors.danger), title: const Text('Borç Ekle', style: TextStyle(color: Colors.white)),
-          onTap: () { Navigator.pop(ctx); context.go('/transactions/new?accountId=${widget.accountId}&type=SALE'); }),
-        ListTile(leading: const Icon(Icons.download, color: AppColors.success), title: const Text('Tahsilat Al', style: TextStyle(color: Colors.white)),
-          onTap: () { Navigator.pop(ctx); context.go('/transactions/new?accountId=${widget.accountId}&type=COLLECTION'); }),
-        ListTile(leading: const Icon(Icons.upload, color: AppColors.warning), title: const Text('Ödeme Yap', style: TextStyle(color: Colors.white)),
-          onTap: () { Navigator.pop(ctx); context.go('/transactions/new?accountId=${widget.accountId}&type=PAYMENT'); }),
-      ])));
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.edit, color: AppColors.primary),
+                title: const Text('Cariyi Düzenle', style: TextStyle(color: Colors.white)),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  await context.push('/accounts/${widget.accountId}/edit');
+                  _loadData();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: AppColors.danger),
+                title: const Text('Cariyi Sil', style: TextStyle(color: AppColors.danger)),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (dCtx) => AlertDialog(
+                      backgroundColor: AppColors.surfaceDark,
+                      title: const Text('Cariyi Sil', style: TextStyle(color: AppColors.danger)),
+                      content: const Text('Bu cari hesabı silmek istediğinize emin misiniz?'),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(dCtx, false), child: const Text('İptal')),
+                        ElevatedButton(
+                          onPressed: () => Navigator.pop(dCtx, true),
+                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
+                          child: const Text('Sil'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirmed == true) {
+                    final cid = await ApiClient().ensureActiveCompany();
+                    if (cid != null) {
+                      try {
+                        await ApiClient().dio.delete('/companies/$cid/accounts/${widget.accountId}');
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cari başarıyla silindi')));
+                          context.pop();
+                        }
+                      } catch (e) {
+                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Silme hatası: $e')));
+                      }
+                    }
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showAddTransaction() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surfaceDark,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('İşlem Ekle', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.add_circle, color: AppColors.danger),
+              title: const Text('Borç Ekle (Satış)', style: TextStyle(color: Colors.white)),
+              onTap: () async {
+                Navigator.pop(ctx);
+                await context.push('/transactions/new?accountId=${widget.accountId}&type=SALE');
+                _loadData();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.download, color: AppColors.success),
+              title: const Text('Tahsilat Al', style: TextStyle(color: Colors.white)),
+              onTap: () async {
+                Navigator.pop(ctx);
+                await context.push('/transactions/new?accountId=${widget.accountId}&type=COLLECTION');
+                _loadData();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.upload, color: AppColors.warning),
+              title: const Text('Ödeme Yap', style: TextStyle(color: Colors.white)),
+              onTap: () async {
+                Navigator.pop(ctx);
+                await context.push('/transactions/new?accountId=${widget.accountId}&type=PAYMENT');
+                _loadData();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.shopping_cart, color: AppColors.accent),
+              title: const Text('Alacak Ekle (Alış)', style: TextStyle(color: Colors.white)),
+              onTap: () async {
+                Navigator.pop(ctx);
+                await context.push('/transactions/new?accountId=${widget.accountId}&type=PURCHASE');
+                _loadData();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

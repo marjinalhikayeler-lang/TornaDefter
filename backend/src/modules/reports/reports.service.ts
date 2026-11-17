@@ -159,6 +159,79 @@ export class ReportsService {
     };
   }
 
+  /** 7. Ana sayfa / Dashboard özeti */
+  async getDashboardSummary(companyId: string) {
+    // 1. Cari Bakiyeleri (Müşteri alacakları & Tedarikçi borçları)
+    const accounts = await this.prisma.account.findMany({
+      where: { company_id: companyId, deleted_at: null, is_archived: false },
+      select: { id: true, opening_balance: true, opening_balance_direction: true },
+    });
+
+    let totalReceivables = 0; // Müşterilerden alacaklarımız
+    let totalPayables = 0;    // Tedarikçilere borçlarımız
+
+    for (const acc of accounts) {
+      const debits = await this.prisma.transaction.aggregate({
+        where: { account_id: acc.id, deleted_at: null, type: { in: ['SALE', 'PURCHASE', 'SALARY', 'ADVANCE'] } },
+        _sum: { amount: true },
+      });
+      const credits = await this.prisma.transaction.aggregate({
+        where: { account_id: acc.id, deleted_at: null, type: { in: ['COLLECTION', 'PAYMENT'] } },
+        _sum: { amount: true },
+      });
+
+      let bal = acc.opening_balance_direction === 'DEBIT' ? acc.opening_balance : -acc.opening_balance;
+      bal += (debits._sum.amount || 0) - (credits._sum.amount || 0);
+
+      if (bal > 0) {
+        totalReceivables += bal;
+      } else if (bal < 0) {
+        totalPayables += Math.abs(bal);
+      }
+    }
+
+    // 2. Kasa + Banka bakiyeleri
+    const [cashAccounts, bankAccounts] = await Promise.all([
+      this.prisma.cashAccount.findMany({ where: { company_id: companyId, deleted_at: null }, select: { current_balance: true } }),
+      this.prisma.bankAccount.findMany({ where: { company_id: companyId, deleted_at: null }, select: { current_balance: true } }),
+    ]);
+    const totalCash = cashAccounts.reduce((s, a) => s + (a.current_balance || 0), 0);
+    const totalBank = bankAccounts.reduce((s, a) => s + (a.current_balance || 0), 0);
+
+    // 3. Gelir & Gider bakiyeleri
+    const incomeExpenses = await this.prisma.incomeExpense.findMany({
+      where: { company_id: companyId, deleted_at: null },
+      select: { type: true, amount: true },
+    });
+    const totalIncome = incomeExpenses.filter(e => e.type === 'INCOME').reduce((s, e) => s + e.amount, 0);
+    const totalExpense = incomeExpenses.filter(e => e.type === 'EXPENSE').reduce((s, e) => s + e.amount, 0);
+
+    // 4. Vadesi yaklaşan çek / senetler
+    const upcomingCheques = await this.prisma.chequeNote.findMany({
+      where: {
+        company_id: companyId,
+        deleted_at: null,
+        status: 'IN_PORTFOLIO',
+        due_date: { gte: new Date() },
+      },
+      take: 5,
+      orderBy: { due_date: 'asc' },
+    });
+
+    return {
+      total_receivables: totalReceivables,
+      total_payables: totalPayables,
+      net_balance: totalReceivables - totalPayables,
+      total_cash: totalCash,
+      total_bank: totalBank,
+      total_cash_bank: totalCash + totalBank,
+      total_income: totalIncome,
+      total_expense: totalExpense,
+      net_income: totalIncome - totalExpense,
+      upcoming_cheques: upcomingCheques,
+    };
+  }
+
   /** 10. Kâr/Zarar özeti */
   async profitLossReport(companyId: string, startDate?: string, endDate?: string) {
     const ieReport = await this.incomeExpenseReport(companyId, startDate, endDate);
