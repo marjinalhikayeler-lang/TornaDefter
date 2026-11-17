@@ -5,16 +5,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 final apiClientProvider = Provider<ApiClient>((ref) => ApiClient());
 
 class ApiClient {
-  static const String baseUrl = 'http://10.0.2.2:3000/api/v1'; // Android emulator
+  static const String defaultBaseUrl = 'http://192.168.1.152:3000/api/v1';
   static final ApiClient _instance = ApiClient._internal();
   factory ApiClient() => _instance;
 
   late final Dio dio;
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
+  String _baseUrl = defaultBaseUrl;
+
+  String get baseUrl => _baseUrl;
 
   ApiClient._internal() {
     dio = Dio(BaseOptions(
-      baseUrl: baseUrl,
+      baseUrl: defaultBaseUrl,
       connectTimeout: const Duration(seconds: 15),
       receiveTimeout: const Duration(seconds: 15),
       headers: {
@@ -22,6 +25,8 @@ class ApiClient {
         'Accept': 'application/json',
       },
     ));
+
+    _initUrl();
 
     dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
@@ -63,6 +68,31 @@ class ApiClient {
         return handler.next(error);
       },
     ));
+  }
+
+  Future<void> _initUrl() async {
+    try {
+      final savedUrl = await _storage.read(key: 'custom_api_base_url');
+      if (savedUrl != null && savedUrl.trim().isNotEmpty) {
+        _baseUrl = savedUrl.trim();
+        dio.options.baseUrl = _baseUrl;
+      }
+    } catch (_) {}
+  }
+
+  Future<void> setBaseUrl(String newUrl) async {
+    _baseUrl = newUrl.trim();
+    dio.options.baseUrl = _baseUrl;
+    await _storage.write(key: 'custom_api_base_url', value: _baseUrl);
+  }
+
+  Future<String> getBaseUrl() async {
+    try {
+      final savedUrl = await _storage.read(key: 'custom_api_base_url');
+      return savedUrl?.trim() ?? _baseUrl;
+    } catch (_) {
+      return _baseUrl;
+    }
   }
 
   Future<void> setTokens(String accessToken, String refreshToken) async {

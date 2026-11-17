@@ -34,32 +34,117 @@ class _LoginScreenState extends State<LoginScreen> {
       }
       if (mounted) context.go('/home');
     } on DioException catch (e) {
-      setState(() => _error = e.response?.data?['message'] ?? 'Giriş başarısız');
+      final msg = e.response?.data?['message'];
+      if (msg is List) {
+        setState(() => _error = msg.join('\n'));
+      } else if (msg is String) {
+        setState(() => _error = msg);
+      } else if (e.type == DioExceptionType.connectionTimeout || e.type == DioExceptionType.connectionError) {
+        setState(() => _error = 'Sunucuya bağlanılamadı. Bilgisayarınızda backend sunucusunun (npm run start:dev) çalıştığından ve aynı Wi-Fi ağında olduğunuzdan emin olun.');
+      } else {
+        setState(() => _error = e.response?.data?['error']?['message'] ?? 'Giriş başarısız (${e.message})');
+      }
+    } catch (e) {
+      setState(() => _error = 'Hata: $e');
     } finally {
       setState(() => _loading = false);
     }
+  }
+
+  void _showServerSettingsDialog() async {
+    final currentUrl = await ApiClient().getBaseUrl();
+    final urlCtrl = TextEditingController(text: currentUrl);
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.cardDark,
+        title: const Text('Sunucu Bağlantı Ayarı', style: TextStyle(color: Colors.white, fontSize: 18)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Backend API adresinizi girin (Örn: http://192.168.1.152:3000/api/v1 veya bulut URL):',
+              style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: urlCtrl,
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: AppColors.backgroundDark,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                hintText: 'http://192.168.1.152:3000/api/v1',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('İptal', style: TextStyle(color: AppColors.textSecondaryDark)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (urlCtrl.text.trim().isNotEmpty) {
+                await ApiClient().setBaseUrl(urlCtrl.text.trim());
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Sunucu adresi kaydedildi')),
+                  );
+                }
+              }
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            child: const Text('Kaydet', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings, color: AppColors.textSecondaryDark),
+            tooltip: 'Sunucu Bağlantı Ayarı',
+            onPressed: _showServerSettingsDialog,
+          ),
+        ],
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
           child: Column(
             children: [
-              const SizedBox(height: 60),
-              Container(
-                width: 80, height: 80,
-                decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(20)),
-                child: const Center(child: Text('TD', style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.white))),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Image.asset(
+                  'assets/images/logo.png',
+                  width: 90,
+                  height: 90,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    width: 90, height: 90,
+                    decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(20)),
+                    child: const Center(child: Icon(Icons.settings_suggest, size: 48, color: Colors.white)),
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
               const Text('TornaDefter', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
               const SizedBox(height: 4),
               const Text('Hesabınıza giriş yapın', style: TextStyle(color: AppColors.textSecondaryDark)),
-              const SizedBox(height: 40),
+              const SizedBox(height: 32),
               if (_error != null)
                 Container(
                   width: double.infinity, padding: const EdgeInsets.all(12), margin: const EdgeInsets.only(bottom: 16),
@@ -107,6 +192,12 @@ class _LoginScreenState extends State<LoginScreen> {
                   const Text('Hesabınız yok mu?', style: TextStyle(color: AppColors.textSecondaryDark)),
                   TextButton(onPressed: () => context.go('/register'), child: const Text('Kayıt Ol', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600))),
                 ],
+              ),
+              const SizedBox(height: 12),
+              TextButton.icon(
+                icon: const Icon(Icons.dns_outlined, size: 16, color: AppColors.textSecondaryDark),
+                label: const Text('Sunucu Ayarı (IP / Port)', style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 13)),
+                onPressed: _showServerSettingsDialog,
               ),
             ],
           ),

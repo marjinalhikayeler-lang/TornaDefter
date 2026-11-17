@@ -124,8 +124,8 @@ async function bootstrap() {
   // Uygulamayı başlat
   // ============================================
   const port = process.env.PORT || 3000;
-  await app.listen(port);
-  logger.log(`🚀 TornaDefter API sunucusu ${port} portunda çalışıyor`);
+  await app.listen(port, '0.0.0.0');
+  logger.log(`🚀 TornaDefter API sunucusu 0.0.0.0:${port} adresinde dinliyor`);
   logger.log(`📚 Swagger dokümantasyonu: http://localhost:${port}/api/docs`);
 }
 

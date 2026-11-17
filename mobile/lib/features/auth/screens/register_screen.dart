@@ -38,20 +38,101 @@ class _RegisterScreenState extends State<RegisterScreen> {
       await ApiClient().setTokens(res.data['access_token'], res.data['refresh_token']);
       if (mounted) context.go('/home');
     } on DioException catch (e) {
-      setState(() => _error = e.response?.data?['message'] ?? 'Kayıt başarısız');
+      final msg = e.response?.data?['message'];
+      if (msg is List) {
+        setState(() => _error = msg.join('\n'));
+      } else if (msg is String) {
+        setState(() => _error = msg);
+      } else if (e.type == DioExceptionType.connectionTimeout || e.type == DioExceptionType.connectionError) {
+        setState(() => _error = 'Sunucuya bağlanılamadı. Bilgisayarınızda backend sunucusunun (npm run start:dev) açık ve aynı Wi-Fi ağında olduğunuzdan emin olun.');
+      } else {
+        setState(() => _error = e.response?.data?['error']?['message'] ?? 'Kayıt başarısız (${e.message})');
+      }
+    } catch (e) {
+      setState(() => _error = 'Hata: $e');
     } finally {
       setState(() => _loading = false);
     }
+  }
+
+  void _showServerSettingsDialog() async {
+    final currentUrl = await ApiClient().getBaseUrl();
+    final urlCtrl = TextEditingController(text: currentUrl);
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.cardDark,
+        title: const Text('Sunucu Bağlantı Ayarı', style: TextStyle(color: Colors.white, fontSize: 18)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Backend API adresinizi girin (Örn: http://192.168.1.152:3000/api/v1):',
+              style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: urlCtrl,
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: AppColors.backgroundDark,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                hintText: 'http://192.168.1.152:3000/api/v1',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('İptal', style: TextStyle(color: AppColors.textSecondaryDark)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (urlCtrl.text.trim().isNotEmpty) {
+                await ApiClient().setBaseUrl(urlCtrl.text.trim());
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Sunucu adresi kaydedildi')),
+                  );
+                }
+              }
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            child: const Text('Kaydet', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
-      appBar: AppBar(title: const Text('Kayıt Ol'), leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.go('/login'))),
+      appBar: AppBar(
+        title: const Text('Kayıt Ol'),
+        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.go('/login')),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings, color: AppColors.textSecondaryDark),
+            tooltip: 'Sunucu Bağlantı Ayarı',
+            onPressed: _showServerSettingsDialog,
+          ),
+        ],
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Image.asset('assets/images/logo.png', width: 70, height: 70, fit: BoxFit.cover),
+          ),
+          const SizedBox(height: 16),
           if (_error != null) Container(width: double.infinity, padding: const EdgeInsets.all(12), margin: const EdgeInsets.only(bottom: 16),
             decoration: BoxDecoration(color: AppColors.danger.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
             child: Text(_error!, style: const TextStyle(color: AppColors.danger))),
