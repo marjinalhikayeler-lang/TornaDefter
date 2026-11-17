@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 final apiClientProvider = Provider<ApiClient>((ref) => ApiClient());
 
 class ApiClient {
-  static const String defaultBaseUrl = 'http://192.168.1.152:3000/api/v1';
+  static const String defaultBaseUrl = 'https://tornadefter.onrender.com/api/v1';
   static final ApiClient _instance = ApiClient._internal();
   factory ApiClient() => _instance;
 

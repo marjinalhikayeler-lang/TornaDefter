@@ -80,7 +80,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 filled: true,
                 fillColor: AppColors.backgroundDark,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                hintText: 'http://192.168.1.152:3000/api/v1',
+                hintText: 'https://tornadefter.onrender.com/api/v1',
               ),
             ),
           ],
