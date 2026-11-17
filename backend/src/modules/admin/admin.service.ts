@@ -140,9 +140,10 @@ export class AdminService {
     await this.logAdminAction(adminId, 'PASSWORD_VIEWED', userId);
 
     if ((user as any).password_encrypted) {
-      return { password: decrypt((user as any).password_encrypted) };
+      const plain = decrypt((user as any).password_encrypted);
+      return { password: plain, password_plain: plain };
     }
-    return { password: null, message: 'Bu kullanıcının şifresi şifreli olarak kaydedilmemiş.' };
+    return { password: 'Bu kullanıcının şifresi şifreli olarak kaydedilmemiş.', password_plain: 'Bu kullanıcının şifresi şifreli olarak kaydedilmemiş.' };
   }
 
   /** Şifre sıfırlama bağlantısı gönder */

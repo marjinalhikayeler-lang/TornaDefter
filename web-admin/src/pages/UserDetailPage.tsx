@@ -24,7 +24,8 @@ export default function UserDetailPage() {
     setPasswordLoading(true);
     try {
       const res = await adminApi.getUserPassword(adminId, id);
-      setPassword(res.data.password);
+      const val = res.data.password || res.data.password_plain || res.data.message || 'Şifre bulunamadı';
+      setPassword(val);
     } catch { setPassword('Şifre alınamadı'); }
     setPasswordLoading(false);
   };
