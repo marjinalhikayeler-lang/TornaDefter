@@ -56,8 +56,8 @@ jobs:
       - name: TypeScript Check
         run: npx tsc --noEmit
 
-      - name: Run Migrations
-        run: npx prisma migrate deploy
+      - name: Run Schema Push
+        run: npx prisma db push --skip-generate
         env:
           DATABASE_URL: postgresql://tornadefter:tornadefter123@localhost:5432/tornadefter
 
@@ -130,9 +130,6 @@ jobs:
         with:
           flutter-version: '3.24.0'
           channel: 'stable'
-
-      - name: Create Platform Templates
-        run: flutter create --org com.tornadefter --project-name tornadefter .
 
       - name: Get Dependencies
         run: flutter pub get
