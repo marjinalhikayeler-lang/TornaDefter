@@ -371,9 +371,6 @@ class _TicketDetailScreenState extends State<_TicketDetailScreen> {
                     },
                   ),
           ),
-              },
-            ),
-          ),
           Container(
             padding: const EdgeInsets.all(8),
             color: AppColors.darkSurface,
