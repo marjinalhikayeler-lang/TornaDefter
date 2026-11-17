@@ -85,7 +85,7 @@ temp/
 *.backup
 
 # Yedekleme dosyaları
-backups/
+/backups/
 *.sql.gz
 *.dump
 
