@@ -26,13 +26,18 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
   Future<void> _loadBackups() async {
     try {
       final api = ref.read(apiClientProvider);
-      final res = await api.get('/backups');
+      final cid = await api.ensureActiveCompany();
+      if (cid == null) {
+        if (mounted) setState(() => _loading = false);
+        return;
+      }
+      final res = await api.get('/companies/$cid/backups');
       setState(() {
-        _backups = res.data['data'] ?? res.data ?? [];
+        _backups = res.data['data'] ?? res.data is List ? res.data : [];
         _loading = false;
       });
     } catch (e) {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -40,7 +45,9 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
     setState(() => _creating = true);
     try {
       final api = ref.read(apiClientProvider);
-      await api.post('/backups', data: {'type': 'MANUAL'});
+      final cid = await api.ensureActiveCompany();
+      if (cid == null) return;
+      await api.post('/companies/$cid/backups');
       await _loadBackups();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -50,11 +57,11 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Yedekleme başarısız'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Yedekleme başarısız: $e'), backgroundColor: Colors.red),
         );
       }
     }
-    setState(() => _creating = false);
+    if (mounted) setState(() => _creating = false);
   }
 
   Future<void> _restoreBackup(String id) async {
@@ -81,7 +88,9 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
 
     try {
       final api = ref.read(apiClientProvider);
-      await api.post('/backups/$id/restore');
+      final cid = await api.ensureActiveCompany();
+      if (cid == null) return;
+      await api.post('/companies/$cid/backups/$id/restore');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Geri yükleme başarılı'), backgroundColor: AppColors.creditGreen),
@@ -90,7 +99,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Geri yükleme başarısız'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Geri yükleme başarısız: $e'), backgroundColor: Colors.red),
         );
       }
     }

@@ -41,7 +41,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   Future<void> _markAsRead(String id) async {
     try {
       final api = ref.read(apiClientProvider);
-      await api.put('/notifications/$id/read');
+      await api.post('/notifications/$id/read');
       _loadNotifications();
     } catch (_) {}
   }
@@ -49,7 +49,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   Future<void> _markAllRead() async {
     try {
       final api = ref.read(apiClientProvider);
-      await api.put('/notifications/read-all');
+      await api.post('/notifications/read-all');
       _loadNotifications();
     } catch (_) {}
   }

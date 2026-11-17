@@ -22,6 +22,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   String _paymentMethod = 'CASH';
   String? _accountId;
   bool _loading = false;
+  List<dynamic> _accounts = [];
 
   final _typeLabels = {'SALE': 'Borç Ekle', 'COLLECTION': 'Tahsilat', 'PURCHASE': 'Alacak Ekle', 'PAYMENT': 'Ödeme'};
   final _paymentMethods = [('CASH', 'Nakit'), ('BANK_TRANSFER', 'Havale/EFT'), ('CREDIT_CARD', 'Kredi Kartı'), ('CHEQUE', 'Çek'), ('PROMISSORY_NOTE', 'Senet')];
@@ -31,6 +32,23 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     super.initState();
     _type = widget.type ?? 'SALE';
     _accountId = widget.accountId;
+    _loadAccounts();
+  }
+
+  Future<void> _loadAccounts() async {
+    try {
+      final cid = await ApiClient().ensureActiveCompany();
+      if (cid != null) {
+        final res = await ApiClient().dio.get('/companies/$cid/accounts');
+        final list = res.data is List ? res.data : (res.data?['data'] ?? []);
+        setState(() {
+          _accounts = list as List;
+          if (_accountId == null && _accounts.isNotEmpty) {
+            _accountId = _accounts[0]['id'];
+          }
+        });
+      }
+    } catch (_) {}
   }
 
   String get _title => _typeLabels[_type] ?? 'İşlem Ekle';
@@ -80,6 +98,23 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
         IconButton(icon: const Icon(Icons.save), onPressed: _loading ? null : _save),
       ]),
       body: SingleChildScrollView(padding: const EdgeInsets.all(16), child: Column(children: [
+        if (_accounts.isNotEmpty) ...[
+          DropdownButtonFormField<String>(
+            value: _accountId,
+            dropdownColor: AppColors.surfaceDark,
+            style: const TextStyle(color: Colors.white, fontSize: 16),
+            decoration: const InputDecoration(
+              labelText: 'Cari Hesap Seçin *',
+              prefixIcon: Icon(Icons.person, color: AppColors.primary),
+            ),
+            items: _accounts.map<DropdownMenuItem<String>>((a) => DropdownMenuItem(
+              value: a['id'] as String,
+              child: Text(a['title'] ?? '', overflow: TextOverflow.ellipsis),
+            )).toList(),
+            onChanged: (v) => setState(() => _accountId = v),
+          ),
+          const SizedBox(height: 16),
+        ],
         // Tarih ve saat - OkLif stili
         Row(children: [
           Expanded(child: InkWell(onTap: _pickDate, child: Container(

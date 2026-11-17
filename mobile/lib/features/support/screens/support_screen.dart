@@ -26,8 +26,9 @@ class _SupportScreenState extends ConsumerState<SupportScreen> {
     try {
       final api = ref.read(apiClientProvider);
       final res = await api.get('/support/tickets');
+      final data = res.data is Map ? (res.data['items'] ?? res.data['data'] ?? []) : (res.data is List ? res.data : []);
       setState(() {
-        _tickets = res.data['data'] ?? res.data ?? [];
+        _tickets = data as List;
         _loading = false;
       });
     } catch (e) {
@@ -205,13 +206,30 @@ class _CreateTicketSheetState extends State<_CreateTicketSheet> {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: _loading ? null : () async {
-                  if (_subjectCtrl.text.isEmpty || _messageCtrl.text.isEmpty) return;
+                  if (_subjectCtrl.text.trim().isEmpty || _messageCtrl.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Lütfen konu ve mesaj girin')));
+                    return;
+                  }
                   setState(() => _loading = true);
-                  widget.onCreated();
-                  if (mounted) Navigator.pop(context);
+                  try {
+                    final api = ref.read(apiClientProvider);
+                    final cid = await api.ensureActiveCompany();
+                    await api.post('/support/tickets', data: {
+                      'subject': _subjectCtrl.text.trim(),
+                      'message': _messageCtrl.text.trim(),
+                      'priority': _priority,
+                      'companyId': cid,
+                    });
+                    widget.onCreated();
+                    if (mounted) Navigator.pop(context);
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Talep gönderilemedi: $e')));
+                  } finally {
+                    if (mounted) setState(() => _loading = false);
+                  }
                 },
                 style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, padding: const EdgeInsets.symmetric(vertical: 14)),
-                child: _loading ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Gönder', style: TextStyle(fontSize: 16)),
+                child: _loading ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Gönder', style: TextStyle(fontSize: 16)),
               ),
             ),
           ],
@@ -221,17 +239,63 @@ class _CreateTicketSheetState extends State<_CreateTicketSheet> {
   }
 }
 
-class _TicketDetailScreen extends StatelessWidget {
+class _TicketDetailScreen extends StatefulWidget {
   final dynamic ticket;
   const _TicketDetailScreen({required this.ticket});
 
   @override
+  State<_TicketDetailScreen> createState() => _TicketDetailScreenState();
+}
+
+class _TicketDetailScreenState extends State<_TicketDetailScreen> {
+  final _replyCtrl = TextEditingController();
+  List<dynamic> _messages = [];
+  bool _sending = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _messages = (widget.ticket['messages'] as List?) ?? [];
+    _loadTicketDetails();
+  }
+
+  Future<void> _loadTicketDetails() async {
+    try {
+      final res = await ApiClient().dio.get('/support/tickets/${widget.ticket['id']}');
+      final data = res.data;
+      if (mounted) {
+        setState(() {
+          _messages = (data['messages'] as List?) ?? [];
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _sendReply() async {
+    if (_replyCtrl.text.trim().isEmpty) return;
+    setState(() => _sending = true);
+    try {
+      await ApiClient().dio.post(
+        '/support/tickets/${widget.ticket['id']}/messages',
+        data: {'message': _replyCtrl.text.trim()},
+      );
+      _replyCtrl.clear();
+      await _loadTicketDetails();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Hata: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final messages = ticket['messages'] as List? ?? [];
     return Scaffold(
       backgroundColor: AppColors.darkBg,
       appBar: AppBar(
-        title: Text(ticket['subject'] ?? 'Destek Detay'),
+        title: Text(widget.ticket['subject'] ?? 'Destek Detay'),
         backgroundColor: AppColors.darkSurface,
       ),
       body: Column(
@@ -239,7 +303,7 @@ class _TicketDetailScreen extends StatelessWidget {
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.all(12),
-              itemCount: messages.length + 1,
+              itemCount: _messages.length + 1,
               itemBuilder: (context, i) {
                 if (i == 0) {
                   return Card(
@@ -249,17 +313,17 @@ class _TicketDetailScreen extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(ticket['subject'] ?? '', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                          Text(widget.ticket['subject'] ?? '', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                           const SizedBox(height: 8),
-                          Text(ticket['message'] ?? '', style: const TextStyle(color: Colors.white70)),
+                          Text(widget.ticket['message'] ?? '', style: const TextStyle(color: Colors.white70)),
                           const SizedBox(height: 8),
-                          Text(DateUtil.formatDateTime(ticket['created_at'] ?? ''), style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                          Text(DateUtil.formatDateTime(widget.ticket['created_at'] ?? ''), style: const TextStyle(color: Colors.white38, fontSize: 11)),
                         ],
                       ),
                     ),
                   );
                 }
-                final m = messages[i - 1];
+                final m = _messages[i - 1];
                 final isAdmin = m['sender_type'] == 'ADMIN';
                 return Align(
                   alignment: isAdmin ? Alignment.centerLeft : Alignment.centerRight,
@@ -285,6 +349,30 @@ class _TicketDetailScreen extends StatelessWidget {
                   ),
                 );
               },
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.all(8),
+            color: AppColors.darkSurface,
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _replyCtrl,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(
+                      hintText: 'Yanıt yazın...',
+                      hintStyle: TextStyle(color: Colors.white38),
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: _sending ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.send, color: AppColors.primary),
+                  onPressed: _sending ? null : _sendReply,
+                ),
+              ],
             ),
           ),
         ],
