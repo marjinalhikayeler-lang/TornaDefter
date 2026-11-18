@@ -15,7 +15,27 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordCtrl = TextEditingController();
   bool _loading = false;
   bool _obscure = true;
+  bool _rememberMe = true;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedInfo();
+  }
+
+  Future<void> _loadSavedInfo() async {
+    final remember = await ApiClient().isRememberMe();
+    final savedId = await ApiClient().getSavedIdentifier();
+    if (mounted) {
+      setState(() {
+        _rememberMe = remember;
+        if (savedId != null && savedId.isNotEmpty) {
+          _emailCtrl.text = savedId;
+        }
+      });
+    }
+  }
 
   Future<void> _login() async {
     if (_emailCtrl.text.isEmpty || _passwordCtrl.text.isEmpty) {
@@ -29,6 +49,10 @@ class _LoginScreenState extends State<LoginScreen> {
         'password': _passwordCtrl.text,
       });
       await ApiClient().setTokens(res.data['access_token'], res.data['refresh_token']);
+      await ApiClient().setRememberMe(_rememberMe);
+      if (_rememberMe) {
+        await ApiClient().setSavedIdentifier(_emailCtrl.text.trim());
+      }
       if (res.data['companies'] != null && (res.data['companies'] as List).isNotEmpty) {
         await ApiClient().setActiveCompany(res.data['companies'][0]['id']);
       } else {
@@ -175,9 +199,30 @@ class _LoginScreenState extends State<LoginScreen> {
                 onSubmitted: (_) => _login(),
               ),
               const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(onPressed: () {}, child: const Text('Şifremi Unuttum', style: TextStyle(color: AppColors.primary))),
+              Row(
+                children: [
+                  SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: Checkbox(
+                      value: _rememberMe,
+                      activeColor: AppColors.primary,
+                      checkColor: Colors.white,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      onChanged: (val) => setState(() => _rememberMe = val ?? true),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () => setState(() => _rememberMe = !_rememberMe),
+                    child: const Text(
+                      'Beni Hatırla',
+                      style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                  const Spacer(),
+                  TextButton(onPressed: () {}, child: const Text('Şifremi Unuttum', style: TextStyle(color: AppColors.primary))),
+                ],
               ),
               const SizedBox(height: 16),
               SizedBox(

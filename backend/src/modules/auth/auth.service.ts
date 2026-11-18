@@ -375,7 +375,7 @@ export class AuthService {
         data: {
           token_hash: this.hashToken(tokens.access_token),
           refresh_token_hash: this.hashToken(tokens.refresh_token),
-          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          expires_at: new Date(Date.now() + 3650 * 24 * 60 * 60 * 1000),
           last_active_at: new Date(),
         },
       });
@@ -509,11 +509,11 @@ export class AuthService {
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
         secret: this.configService.get<string>('JWT_SECRET'),
-        expiresIn: this.configService.get<string>('JWT_EXPIRES_IN', '15m'),
+        expiresIn: this.configService.get<string>('JWT_EXPIRES_IN', '3650d'),
       }),
       this.jwtService.signAsync(payload, {
         secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-        expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRES_IN', '7d'),
+        expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRES_IN', '3650d'),
       }),
     ]);
 
@@ -521,7 +521,7 @@ export class AuthService {
       access_token: accessToken,
       refresh_token: refreshToken,
       token_type: 'Bearer',
-      expires_in: 900, // 15 dakika (saniye)
+      expires_in: 315360000, // 10 yıl (saniye)
     };
   }
 
@@ -538,7 +538,7 @@ export class AuthService {
         ip_address: meta.ip_address,
         token_hash: this.hashToken(tokens.access_token),
         refresh_token_hash: this.hashToken(tokens.refresh_token),
-        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        expires_at: new Date(Date.now() + 3650 * 24 * 60 * 60 * 1000),
       },
     });
   }

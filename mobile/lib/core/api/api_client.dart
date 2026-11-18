@@ -135,12 +135,35 @@ class ApiClient {
   }
 
   Future<void> clearTokens() async {
+    final remember = await isRememberMe();
+    final savedId = await getSavedIdentifier();
     await _storage.deleteAll();
+    if (remember && savedId != null) {
+      await setSavedIdentifier(savedId);
+      await setRememberMe(true);
+    }
+  }
+
+  Future<void> setRememberMe(bool value) async {
+    await _storage.write(key: 'remember_me', value: value ? 'true' : 'false');
+  }
+
+  Future<bool> isRememberMe() async {
+    final val = await _storage.read(key: 'remember_me');
+    return val != 'false'; // Varsayılan olarak açık (true)
+  }
+
+  Future<void> setSavedIdentifier(String identifier) async {
+    await _storage.write(key: 'saved_identifier', value: identifier);
+  }
+
+  Future<String?> getSavedIdentifier() async {
+    return _storage.read(key: 'saved_identifier');
   }
 
   Future<bool> hasToken() async {
     final token = await _storage.read(key: 'access_token');
-    return token != null;
+    return token != null && token.isNotEmpty;
   }
 
   Future<Response<T>> get<T>(String path, {Map<String, dynamic>? queryParameters}) {

@@ -18,9 +18,18 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _checkAuth() async {
     await Future.delayed(const Duration(seconds: 2));
+    final rememberMe = await ApiClient().isRememberMe();
     final hasToken = await ApiClient().hasToken();
+    if (rememberMe && hasToken) {
+      // Arka planda aktif firmayı doğrula ve hazırla
+      await ApiClient().ensureActiveCompany();
+      if (mounted) {
+        context.go('/home');
+        return;
+      }
+    }
     if (mounted) {
-      context.go(hasToken ? '/home' : '/login');
+      context.go('/login');
     }
   }
 
