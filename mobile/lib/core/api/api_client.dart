@@ -119,6 +119,17 @@ class ApiClient {
         await setActiveCompany(companyId!);
         return companyId;
       }
+      // Liste boşsa hemen otomatik oluştur ve aktif yap
+      final createRes = await dio.post('/companies', data: {
+        'name': 'İşletmem',
+        'default_currency': 'TRY',
+      });
+      final created = createRes.data is Map ? createRes.data : null;
+      if (created != null && created['id'] != null) {
+        companyId = created['id'];
+        await setActiveCompany(companyId!);
+        return companyId;
+      }
     } catch (_) {}
     return null;
   }

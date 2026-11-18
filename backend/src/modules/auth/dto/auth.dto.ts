@@ -24,6 +24,11 @@ export class RegisterDto {
   @IsNotEmpty({ message: 'Soyad alanı zorunludur.' })
   last_name: string;
 
+  @ApiPropertyOptional({ description: 'Firma / İşletme Adı', example: 'Torna Sanayi Ltd.' })
+  @IsOptional()
+  @IsString()
+  company_name?: string;
+
   @ApiProperty({ description: 'E-posta adresi', example: 'ahmet@ornek.com' })
   @IsEmail({}, { message: 'Geçerli bir e-posta adresi girin.' })
   email: string;

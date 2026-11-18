@@ -123,6 +123,21 @@ export class CompaniesService {
       },
     });
 
+    if (memberships.length === 0) {
+      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+      const compName = user ? `${user.first_name} ${user.last_name} İşletmesi` : 'İşletmem';
+      const newComp = await this.create(userId, { name: compName });
+      return [{
+        id: newComp.id,
+        name: newComp.name,
+        logo_url: newComp.logo_url,
+        default_currency: newComp.default_currency,
+        is_archived: newComp.is_archived,
+        created_at: newComp.created_at,
+        role: 'OWNER',
+      }];
+    }
+
     return memberships.map((m) => ({
       ...m.company,
       role: m.role,

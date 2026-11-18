@@ -13,6 +13,7 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   final _firstNameCtrl = TextEditingController();
   final _lastNameCtrl = TextEditingController();
+  final _companyNameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
@@ -29,6 +30,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final res = await ApiClient().dio.post('/auth/register', data: {
         'first_name': _firstNameCtrl.text.trim(),
         'last_name': _lastNameCtrl.text.trim(),
+        'company_name': _companyNameCtrl.text.trim().isEmpty ? null : _companyNameCtrl.text.trim(),
         'email': _emailCtrl.text.trim(),
         'phone': _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
         'password': _passwordCtrl.text,
@@ -38,6 +40,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       await ApiClient().setTokens(res.data['access_token'], res.data['refresh_token']);
       if (res.data['companies'] != null && (res.data['companies'] as List).isNotEmpty) {
         await ApiClient().setActiveCompany(res.data['companies'][0]['id']);
+      } else {
+        await ApiClient().ensureActiveCompany();
       }
       if (mounted) context.go('/home');
     } on DioException catch (e) {
@@ -142,6 +146,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           TextField(controller: _firstNameCtrl, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(hintText: 'Ad', prefixIcon: Icon(Icons.person_outline, color: AppColors.textSecondaryDark))),
           const SizedBox(height: 12),
           TextField(controller: _lastNameCtrl, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(hintText: 'Soyad', prefixIcon: Icon(Icons.person_outline, color: AppColors.textSecondaryDark))),
+          const SizedBox(height: 12),
+          TextField(controller: _companyNameCtrl, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(hintText: 'Firma / Bayi / İşletme Adı', prefixIcon: Icon(Icons.business_outlined, color: AppColors.textSecondaryDark))),
           const SizedBox(height: 12),
           TextField(controller: _emailCtrl, keyboardType: TextInputType.emailAddress, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(hintText: 'E-posta', prefixIcon: Icon(Icons.email_outlined, color: AppColors.textSecondaryDark))),
           const SizedBox(height: 12),

@@ -112,9 +112,13 @@ export class AuthService {
     }
 
     // Otomatik varsayılan işletme/firma oluştur
+    const companyName = (dto.company_name && dto.company_name.trim().length > 0)
+      ? dto.company_name.trim()
+      : `${dto.first_name} ${dto.last_name} İşletmesi`;
+
     const company = await this.prisma.company.create({
       data: {
-        name: `${dto.first_name} ${dto.last_name} İşletmesi`,
+        name: companyName,
         owner_id: user.id,
         default_currency: 'TRY',
       },
@@ -125,6 +129,15 @@ export class AuthService {
         company_id: company.id,
         user_id: user.id,
         role: 'OWNER',
+      },
+    });
+
+    // Varsayılan kasa oluştur
+    await this.prisma.cashAccount.create({
+      data: {
+        company_id: company.id,
+        name: 'Ana Kasa',
+        currency: 'TRY',
       },
     });
 
@@ -259,7 +272,7 @@ export class AuthService {
     });
 
     // Kullanıcının firmalarını getir
-    const companies = await this.prisma.companyUser.findMany({
+    let companies = await this.prisma.companyUser.findMany({
       where: { user_id: user.id },
       include: {
         company: {
@@ -272,6 +285,45 @@ export class AuthService {
         },
       },
     });
+
+    // Eğer kullanıcının hiç firması yoksa hemen varsayılan firma oluştur
+    if (companies.length === 0) {
+      const defaultComp = await this.prisma.company.create({
+        data: {
+          name: `${user.first_name} ${user.last_name} İşletmesi`,
+          owner_id: user.id,
+          default_currency: 'TRY',
+        },
+      });
+
+      const cu = await this.prisma.companyUser.create({
+        data: {
+          company_id: defaultComp.id,
+          user_id: user.id,
+          role: 'OWNER',
+        },
+        include: {
+          company: {
+            select: {
+              id: true,
+              name: true,
+              logo_url: true,
+              default_currency: true,
+            },
+          },
+        },
+      });
+
+      await this.prisma.cashAccount.create({
+        data: {
+          company_id: defaultComp.id,
+          name: 'Ana Kasa',
+          currency: 'TRY',
+        },
+      });
+
+      companies = [cu];
+    }
 
     return {
       user: this.sanitizeUser(user),

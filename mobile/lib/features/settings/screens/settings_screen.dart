@@ -126,31 +126,140 @@ class SettingsScreen extends StatelessWidget {
   }
 
   void _showCompanyDialog(BuildContext context) async {
-    final cid = await ApiClient().ensureActiveCompany();
-    if (!context.mounted) return;
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surfaceDark,
-        title: const Text('Firma Bilgisi', style: TextStyle(color: Colors.white)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Aktif İşletme / Firma:', style: TextStyle(color: AppColors.textSecondaryDark)),
-            const SizedBox(height: 6),
-            Text(cid != null ? 'Firma ID: $cid' : 'Aktif firma bulunamadı', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            const Text('TornaDefter tek kullanıcı ve çoklu firma desteği sunmaktadır.', style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 12)),
-          ],
+      isScrollControlled: true,
+      backgroundColor: AppColors.surfaceDark,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => FutureBuilder(
+          future: Future.wait([
+            ApiClient().ensureActiveCompany(),
+            ApiClient().dio.get('/companies').catchError((_) => null as dynamic),
+          ]),
+          builder: (ctx, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const SizedBox(
+                height: 250,
+                child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+              );
+            }
+
+            final activeCid = snapshot.data?[0] as String?;
+            final res = snapshot.data?[1];
+            final companies = (res?.data is List ? res.data : (res?.data?['data'] ?? [])) as List;
+
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 20, right: 20, top: 20,
+                  bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Firma & Bayi Yönetimi', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                        IconButton(icon: const Icon(Icons.close, color: AppColors.textSecondaryDark), onPressed: () => Navigator.pop(ctx)),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    const Text('İşlem yapmak istediğiniz firmayı/bayiyi seçin veya yenisini oluşturun:', style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 13)),
+                    const SizedBox(height: 16),
+                    if (companies.isEmpty)
+                      const Center(child: Padding(padding: EdgeInsets.all(16), child: Text('Kayıtlı firma bulunamadı', style: TextStyle(color: AppColors.textSecondaryDark))))
+                    else
+                      ...companies.map<Widget>((c) {
+                        final id = c['id'] as String;
+                        final name = c['name'] ?? 'İşletme';
+                        final isSelected = id == activeCid;
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          decoration: BoxDecoration(
+                            color: isSelected ? AppColors.primary.withOpacity(0.15) : AppColors.cardDark,
+                            border: Border.all(color: isSelected ? AppColors.primary : Colors.transparent),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: ListTile(
+                            leading: Icon(Icons.business, color: isSelected ? AppColors.primary : AppColors.textSecondaryDark),
+                            title: Text(name, style: TextStyle(color: Colors.white, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                            subtitle: Text('ID: ${id.length > 8 ? id.substring(0, 8) : id}...', style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 11)),
+                            trailing: isSelected ? const Icon(Icons.check_circle, color: AppColors.primary) : null,
+                            onTap: () async {
+                              await ApiClient().setActiveCompany(id);
+                              if (ctx.mounted) {
+                                Navigator.pop(ctx);
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Aktif firma "$name" olarak değiştirildi')));
+                              }
+                            },
+                          ),
+                        );
+                      }),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.add),
+                        label: const Text('Yeni Firma / Bayi Oluştur'),
+                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+                        onPressed: () {
+                          final nameCtrl = TextEditingController();
+                          showDialog(
+                            context: ctx,
+                            builder: (dCtx) => AlertDialog(
+                              backgroundColor: AppColors.surfaceDark,
+                              title: const Text('Yeni Firma / Bayi', style: TextStyle(color: Colors.white)),
+                              content: TextField(
+                                controller: nameCtrl,
+                                style: const TextStyle(color: Colors.white),
+                                decoration: const InputDecoration(
+                                  labelText: 'Firma / Bayi Adı',
+                                  hintText: 'Örn: Torna Metal Ltd. Şti.',
+                                ),
+                              ),
+                              actions: [
+                                TextButton(onPressed: () => Navigator.pop(dCtx), child: const Text('İptal')),
+                                ElevatedButton(
+                                  onPressed: () async {
+                                    if (nameCtrl.text.trim().isEmpty) return;
+                                    try {
+                                      final newRes = await ApiClient().dio.post('/companies', data: {
+                                        'name': nameCtrl.text.trim(),
+                                        'default_currency': 'TRY',
+                                      });
+                                      if (newRes.data != null && newRes.data['id'] != null) {
+                                        await ApiClient().setActiveCompany(newRes.data['id']);
+                                      }
+                                      if (dCtx.mounted) Navigator.pop(dCtx);
+                                      if (ctx.mounted) Navigator.pop(ctx);
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Yeni firma başarıyla oluşturuldu ve aktif yapıldı')));
+                                      }
+                                    } catch (e) {
+                                      if (dCtx.mounted) {
+                                        ScaffoldMessenger.of(dCtx).showSnackBar(SnackBar(content: Text('Hata: $e')));
+                                      }
+                                    }
+                                  },
+                                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+                                  child: const Text('Oluştur'),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
-        actions: [
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx),
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-            child: const Text('Tamam'),
-          ),
-        ],
       ),
     );
   }
