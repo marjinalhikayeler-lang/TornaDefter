@@ -146,8 +146,9 @@ class SettingsScreen extends StatelessWidget {
             }
 
             final activeCid = snapshot.data?[0] as String?;
-            final res = snapshot.data?[1];
-            final companies = (res?.data is List ? res.data : (res?.data?['data'] ?? [])) as List;
+            final dynamic res = snapshot.data?[1];
+            final dynamic resData = res?.data;
+            final companies = (resData is List ? resData : (resData is Map ? (resData['data'] ?? []) : [])) as List;
 
             return SafeArea(
               child: Padding(
